@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend-gis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend_gis_api
+   
+    ports:
+      - "8080:8080"
+    networks:
+      gisnet:
+        aliases:
+          - backend.docker
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  gisnet:
+    external: true
+
