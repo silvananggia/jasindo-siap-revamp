@@ -1,17 +1,17 @@
 version: '3.8'
 
 services:
-  gis-siap:
+  gis-siap-revamp:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gis_siap_frontend
+    container_name: gis_siap_revamp_frontend
     ports:
       - "80:80"
     networks:
       gisnet:
         aliases:
-          - frontend.docker
+          - gis-siap-revamp.docker
     restart: unless-stopped
 
 
