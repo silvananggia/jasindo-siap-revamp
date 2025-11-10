@@ -4,6 +4,6 @@ const authController = require('../controllers/auth.controller');
 const extractCred = require('../middleware/credMiddleware');
 
 
-router.post('/checkAuth', extractCred, authController.checkAuth);
+router.get('/checkAuth', extractCred, authController.checkAuth);
 
 module.exports = router;

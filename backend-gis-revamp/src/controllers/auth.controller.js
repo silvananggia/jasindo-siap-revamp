@@ -8,16 +8,40 @@ const axios = require("axios");
 const BASE_URL = process.env.BASE_URL ;
 
 exports.checkAuth = async (req, res, next) => {
-  const clientCred = req.cred;
-  if (!clientCred) return res.status(401).json({ message: 'No credential found' });
+  // Extract token from Authorization Bearer header
+  let clientToken = null;
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    clientToken = authHeader.substring(7); // Remove 'Bearer ' prefix
+  } else {
+    // Fallback to existing token extraction (from middleware)
+    clientToken = req.token;
+  }
+  
+  if (!clientToken) return res.status(401).json({ message: 'No token found' });
 
   try {
-    const endpoint = 'http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-auth-service/api/v1/auth/login/confirm';
+    const endpoint = `${BASE_URL}/auth/check-auth`;
     
-    const response = await axios.post(endpoint, {
-      product: "autp",
-      cred: clientCred
-    });
+    // Try GET with Authorization header first, fallback to POST if needed
+    let response;
+    try {
+      response = await axios.get(endpoint, {
+        headers: {
+          Authorization: `Bearer ${clientToken}`
+        }
+      });
+    } catch (getError) {
+      // If GET fails, try POST with token in body and header
+      response = await axios.post(endpoint, {
+        token: clientToken
+      }, {
+        headers: {
+          Authorization: `Bearer ${clientToken}`
+        }
+      });
+    }
     
     // console.log("Response from CI:", response.data);
 

@@ -18,7 +18,7 @@ import VectorTileSource from "ol/source/VectorTile";
 import MVT from "ol/format/MVT";
 import { useMap } from "../../hooks/useMap";
 import { useAuthListener } from "../../hooks/useAuthListener";
-import { useURLParams } from "../../hooks/useURLParams";
+import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from "../../utils/mapUtils";
 import { handleSearch } from "../../utils/mapUtils";
 import { getPercilStyle } from "../../utils/percilStyles";
@@ -38,14 +38,32 @@ import { buffer } from "ol/extent";
 
 const MapAnalytic = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { anggotalist, loading: anggotaLoading } = useSelector((state) => state.anggota);
   const { petaklist, loading: petakLoading } = useSelector((state) => state.petak);
 
-  const { formData, setFormData, isDataLoaded } = useURLParams();
+  const [token, setToken] = useState(null);
+  const [formData, setFormData] = useState({
+    nik: '',
+    nama: '',
+    address: '',
+    idkab: '',
+    idkec: '',
+    jmlPetak: 0,
+    luasLahan: 0,
+    noPolis: '',
+    idKelompok: '',
+    idKlaim: '',
+    tglKejadian: '',
+    musimTanam: '',
+    tanggalTanam: '',
+    tanggalPanen: ''
+  });
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const [searchInput, setSearchInput] = useState(formData.address);
+  const [searchInput, setSearchInput] = useState('');
   const [selectedPercils, setSelectedPercils] = useState([]);
   const [autocomplete, setAutocomplete] = useState(null);
   const [selectedBasemap, setSelectedBasemap] = useState("map-switch-basic");
@@ -118,13 +136,68 @@ const MapAnalytic = () => {
     petakLayerVisible ? `function_zxy_id_petakuserklaim/{z}/{x}/{y}?id=${formData.nik}&nopolis=${formData.noPolis}` : ""
   );
 
+  // Initialize formData from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const nik = urlParams.get('nik') || '';
+    const idKelompok = urlParams.get('idkelompok') || '';
+    const nama = urlParams.get('nama') || '';
+    const address = urlParams.get('address') || '';
+    const idkab = urlParams.get('idkab') || '';
+    const idkec = urlParams.get('idkec') || '';
+    const jmlPetak = urlParams.get('jmlPetak') || '0';
+    const luasLahan = urlParams.get('luasLahan') || '0';
+    const noPolis = urlParams.get('noPolis') || '';
+    
+    if (nik || idKelompok || nama || address) {
+      setFormData(prev => ({
+        ...prev,
+        nik,
+        idKelompok,
+        nama,
+        address,
+        idkab,
+        idkec,
+        jmlPetak: parseInt(jmlPetak) || 0,
+        luasLahan: parseFloat(luasLahan) || 0,
+        noPolis
+      }));
+      if (address) {
+        setSearchInput(address);
+      }
+      setIsDataLoaded(true);
+    }
+  }, [location.search]);
+
   useEffect(() => {
     const handleMessage = (e) => {
+      if (e.data && e.data.token) {
+        setToken(e.data.token);
+      }
       if (e.data && e.data.nik) {
-        setFormData(e.data);
-        setSearchInput(e.data.address);
+        setFormData(prev => ({
+          ...prev,
+          ...(e.data.nik && { nik: e.data.nik }),
+          ...(e.data.nama && { nama: e.data.nama }),
+          ...(e.data.address && { address: e.data.address }),
+          ...(e.data.idkab && { idkab: e.data.idkab }),
+          ...(e.data.idkec && { idkec: e.data.idkec }),
+          ...(e.data.jmlPetak && { jmlPetak: e.data.jmlPetak }),
+          ...(e.data.luasLahan && { luasLahan: e.data.luasLahan }),
+          ...(e.data.noPolis && { noPolis: e.data.noPolis }),
+          ...(e.data.idKelompok && { idKelompok: e.data.idKelompok }),
+          ...(e.data.idklaim && { idKlaim: e.data.idklaim }),
+          ...(e.data.tglKejadian && { tglKejadian: e.data.tglKejadian }),
+          ...(e.data.musimTanam && { musimTanam: e.data.musimTanam }),
+          ...(e.data.tanggalTanam && { tanggalTanam: e.data.tanggalTanam }),
+          ...(e.data.tanggalPanen && { tanggalPanen: e.data.tanggalPanen })
+        }));
+        if (e.data.address) {
+          setSearchInput(e.data.address);
+        }
+        setIsDataLoaded(true);
         setTimeout(() => {
-          if (mapInstance.current) {
+          if (mapInstance.current && e.data.address) {
             handleSearch(
               e.data.address,
               mapInstance.current,
@@ -137,7 +210,7 @@ const MapAnalytic = () => {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [mapInstance, setFormData]);
+  }, [mapInstance]);
 
   useEffect(() => {
     setTotalArea(
@@ -252,12 +325,12 @@ const MapAnalytic = () => {
   ];
 
   useEffect( () => {
-    if (formData && formData.idKelompok) {
+    if (formData && formData.idKelompok && token) {
       console.log('formData:', formData);
       console.log('formData.idKelompok:', formData.idKelompok);
-      dispatch(getAnggota(formData.idKelompok));
+      dispatch(getAnggota(formData.idKelompok, token));
     }
-  },[formData.idKelompok]);
+  },[formData.idKelompok, token]);
   // Update polygon layer when formData changes
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current) return;

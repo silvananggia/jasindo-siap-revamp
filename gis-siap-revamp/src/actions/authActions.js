@@ -2,9 +2,9 @@ import { CHECK_AUTH, AUTH_ERROR } from "./types";
 
 import authService from "../services/authService";
 
-export const checkAuth = (cred) => async (dispatch) => {
+export const checkAuth = (token) => async (dispatch) => {
     try {
-        const res = await authService.checkAuth(cred);
+        const res = await authService.checkAuth(token);
         dispatch({
             type: CHECK_AUTH,
             payload: res.data

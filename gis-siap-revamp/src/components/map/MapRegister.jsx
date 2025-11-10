@@ -19,12 +19,13 @@ import { Style, Fill, Stroke } from 'ol/style';
 import { buffer } from "ol/extent";
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
-import { useURLParams } from '../../hooks/useURLParams';
+import { useLocation } from 'react-router-dom';
 import useSwipeGesture from '../../hooks/useSwipeGesture';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { createPetak, getPetakID, getPetakUser, deletePetak, getPetakById, getCenterPetakUser, checkPercilAvailability } from '../../actions/petakActions';
+import { getDetailPeserta } from '../../actions/anggotaActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
 import Spinner from '../Spinner/Loading-spinner';
@@ -37,83 +38,179 @@ const MapRegister = () => {
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
 
   const dispatch = useDispatch();
+  const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { loading: petakLoading } = useSelector((state) => state.petak);
   const listPetak = useSelector((state) => state.petak.petaklist);
 
+  // Get nik and idKelompok from URL parameters
 
-  const { formData, setFormData, isDataLoaded } = useURLParams();
+  const nikFromUrl = new URLSearchParams(location.search).get('nik') || '';
+  const idKelompokFromUrl = new URLSearchParams(location.search).get('idkelompok') || '';
+
+
+
+  const [isDataLoaded, setIsDataLoaded] = useState(!!(nikFromUrl || idKelompokFromUrl));
+  const [token, setToken] = useState(null);
+  const [isFetchingDetail, setIsFetchingDetail] = useState(false);
+  // Store form response data from API
+  const [formResponse, setFormResponse] = useState({
+    nik: nikFromUrl,
+    idKelompok: idKelompokFromUrl,
+    nama: '',
+    address: '',
+    idkab: '',
+    idkec: '',
+    luasLahan: '',
+    jmlPetak: '',
+    musimTanam: '',
+    tanggalTanam: '',
+    tanggalPanen: '',
+    noPolis: '',
+    idKlaim: ''
+  });
+
+  // Listen for token from postMessage
+  useEffect(() => {
+    const handleMessage = (e) => {
+      if (e.data && e.data.token) {
+        setToken(e.data.token);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Update formResponse when URL parameters change
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const nik = urlParams.get('nik') || '';
+    const idKelompok = urlParams.get('idkelompok') || '';
+    
+    if (nik || idKelompok) {
+      setFormResponse(prev => ({
+        ...prev,
+        ...(nik && { nik }),
+        ...(idKelompok && { idKelompok })
+      }));
+      setIsDataLoaded(true);
+    }
+  }, [location.search]);
+
+  // Fetch detail peserta when nik, idKelompok, and token are available
+  useEffect(() => {
+    const fetchDetailPeserta = async () => {
+      const currentNik = formResponse.nik || nikFromUrl;
+      const currentIdKelompok = formResponse.idKelompok || idKelompokFromUrl;
+      
+      if (currentNik && currentIdKelompok && token && !isFetchingDetail) {
+        setIsFetchingDetail(true);
+        try {
+          const result = await dispatch(getDetailPeserta(currentIdKelompok, currentNik, token));
+          
+          // Handle nested response structure: result.data.data.status and result.data.data.data
+          if (result && result.data && result.data.status === 200 && result.data.data) {
+            const data = result.data.data;
+            // Store the API response data directly
+            setFormResponse(prev => ({
+              ...prev,
+              nik: currentNik,
+              idKelompok: currentIdKelompok,
+              nama: data.nama || prev.nama,
+              address: data.address || prev.address,
+              idkab: data.idkab || prev.idkab,
+              idkec: data.idkec || prev.idkec,
+              luasLahan: data.luasLahan || prev.luasLahan,
+              jmlPetak: data.jmlPetak || prev.jmlPetak,
+              musimTanam: data.musimTanam || prev.musimTanam,
+              tanggalTanam: data.tanggalTanam || prev.tanggalTanam,
+              tanggalPanen: data.tanggalPanen || prev.tanggalPanen,
+              noPolis: data.noPolis || prev.noPolis,
+              idKlaim: data.idKlaim || prev.idKlaim
+            }));
+            
+            // Update search input when address is loaded
+            if (data.address) {
+              setSearchInput(data.address);
+              // Trigger search after a delay to allow map to be ready
+              setTimeout(() => {
+                if (mapInstance.current) {
+                  handleSearch(data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
+                }
+              }, 1000);
+            }
+            
+            setIsDataLoaded(true);
+          }
+        } catch (error) {
+          console.error('Error fetching detail peserta:', error);
+        } finally {
+          setIsFetchingDetail(false);
+        }
+      }
+    };
+
+    fetchDetailPeserta();
+  }, [formResponse.nik, formResponse.idKelompok, token, dispatch, nikFromUrl, idKelompokFromUrl]);
   
   // Create a ref to store the current jmlPetak value to avoid closure issues
   const jmlPetakRef = useRef(0);
   
-  // Update jmlPetakRef when formData changes
+  // Update jmlPetakRef when formResponse changes
   useEffect(() => {
-    // console.log('MapRegister - useEffect triggered with formData.jmlPetak:', formData.jmlPetak, 'type:', typeof formData.jmlPetak);
-    if (formData.jmlPetak) {
-      const parsed = parseInt(formData.jmlPetak);
+    // console.log('MapRegister - useEffect triggered with formResponse.jmlPetak:', formResponse.jmlPetak, 'type:', typeof formResponse.jmlPetak);
+    if (formResponse.jmlPetak) {
+      const parsed = parseInt(formResponse.jmlPetak);
       // console.log('MapRegister - Parsed value:', parsed, 'isNaN:', isNaN(parsed), 'parsed > 0:', parsed > 0);
       if (!isNaN(parsed) && parsed > 0) {
         // console.log('MapRegister - Updating jmlPetakRef to:', parsed);
         jmlPetakRef.current = parsed;
       }
     }
-  }, [formData.jmlPetak]);
+  }, [formResponse.jmlPetak]);
 
-  // Debug: Track when jmlPetakRef changes
-  useEffect(() => {
-    // console.log('MapRegister - jmlPetakRef.current changed to:', jmlPetakRef.current, 'type:', typeof jmlPetakRef.current);
-  }, [formData.jmlPetak]);
-
-  // Initialize all formData values as reactive variables using useMemo
+  // Initialize all form values as reactive variables using useMemo from formResponse
   const formDataValues = useMemo(() => {
-    // console.log('formDataValues useMemo - CALLED with formData:', formData);
-    // console.log('formDataValues useMemo - formData.jmlPetak:', formData.jmlPetak, 'type:', typeof formData.jmlPetak);
+    // console.log('formDataValues useMemo - CALLED with formResponse:', formResponse);
+    // console.log('formDataValues useMemo - formResponse.jmlPetak:', formResponse.jmlPetak, 'type:', typeof formResponse.jmlPetak);
     
     // Properly parse jmlPetak from string to number
     let parsedJmlPetak = 0;
-    if (formData.jmlPetak) {
-      const parsed = parseInt(formData.jmlPetak);
+    if (formResponse.jmlPetak) {
+      const parsed = parseInt(formResponse.jmlPetak);
       parsedJmlPetak = isNaN(parsed) ? 0 : parsed;
     }
     
     let parsedLuasLahan = 0;
-    if (formData.luasLahan) {
-      const parsed = parseFloat(formData.luasLahan);
+    if (formResponse.luasLahan) {
+      const parsed = parseFloat(formResponse.luasLahan);
       parsedLuasLahan = isNaN(parsed) ? 0 : parsed;
     }
     
-    // console.log('formDataValues useMemo - parsedJmlPetak:', parsedJmlPetak, 'type:', typeof parsedJmlPetak);
-    // console.log('formDataValues useMemo - formData.jmlPetak raw:', formData.jmlPetak, 'isNaN check:', isNaN(parseInt(formData.jmlPetak)));
-
-    const result = {
-      nik: formData.nik || '',
-      nama: formData.nama || '',
-      address: formData.address || '',
-      idkab: formData.idkab || '',
-      idkec: formData.idkec || '',
+    // Return the form response data with parsed values
+    return {
+      nik: formResponse.nik || '',
+      nama: formResponse.nama || '',
+      address: formResponse.address || '',
+      idkab: formResponse.idkab || '',
+      idkec: formResponse.idkec || '',
       jmlPetak: parsedJmlPetak,
       luasLahan: parsedLuasLahan,
-      noPolis: formData.noPolis || '',
-      idKelompok: formData.idKelompok || '',
-      idKlaim: formData.idKlaim || ''
+      noPolis: formResponse.noPolis || '',
+      idKelompok: formResponse.idKelompok || '',
+      idKlaim: formResponse.idKlaim || '',
+      musimTanam: formResponse.musimTanam || '',
+      tanggalTanam: formResponse.tanggalTanam || '',
+      tanggalPanen: formResponse.tanggalPanen || ''
     };
-    
-    // console.log('formDataValues useMemo - final result:', result);
-    return result;
-  }, [formData]);
+  }, [formResponse]);
 
   // Destructure for easier access
   const { nik, nama, address, idkab, idkec, jmlPetak, luasLahan, noPolis, idKelompok, idKlaim } = formDataValues;
 
-  // Debug: Track when formData changes
-  useEffect(() => {
-    // console.log('MapRegister - formData changed:', formData);
-    // console.log('MapRegister - formData.jmlPetak:', formData.jmlPetak, 'type:', typeof formData.jmlPetak);
-  }, [formData]);
-
-  const [searchInput, setSearchInput] = useState(address);
+  const [searchInput, setSearchInput] = useState('');
   const [selectedPercils, setSelectedPercils] = useState([]);
   const [autocomplete, setAutocomplete] = useState(null);
   const [selectedBasemap, setSelectedBasemap] = useState("map-switch-basic");
@@ -148,16 +245,7 @@ const MapRegister = () => {
 
   const handlePercilSelect = useCallback(async (percilData) => {
     try {
-      // Log all parcel attributes to console
-      console.log('=== PARCEL SELECTED - ALL ATTRIBUTES ===');
-      console.log('Percil Data:', percilData);
-      console.log('All Properties:', Object.keys(percilData));
-      console.log('Property Details:');
-      Object.entries(percilData).forEach(([key, value]) => {
-        console.log(`  ${key}:`, value, `(type: ${typeof value})`);
-      });
-      console.log('==========================================');
-      
+ 
       // Use the ref to get the current jmlPetak value
       const currentJmlPetak = jmlPetakRef.current;
       
@@ -194,8 +282,8 @@ const MapRegister = () => {
       }
 
       // Check if user already has this percil for the same musim_tanam and year
-      const currentMusimTanam = formData.musimTanam || 'MT1';
-      const currentTanggalTanam = formData.tanggalTanam || new Date().toISOString().split('T')[0];
+      const currentMusimTanam = formResponse.musimTanam || 'MT1';
+      const currentTanggalTanam = formResponse.tanggalTanam || new Date().toISOString().split('T')[0];
       
       // Debug: Log the values being used for validation
       const percilId = percilData.petak_id || percilData.psid || percilData.id || percilData.persilid;
@@ -212,7 +300,7 @@ const MapRegister = () => {
           currentTanggalTanam
         ));
         
-        console.log('Availability check result:', availabilityCheck);
+        //console.log('Availability check result:', availabilityCheck);
         
         if (!availabilityCheck.data.isAvailable) {
           const year = new Date(currentTanggalTanam).getFullYear();
@@ -241,7 +329,7 @@ const MapRegister = () => {
         text: 'An error occurred while processing.',
       });
     }
-  }, [dispatch, listPetak, selectedPercils]);
+  }, [dispatch, listPetak, selectedPercils, formResponse]);
 
   const { mapRef, mapInstance, polygonLayerRef, basemapLayerRef } = useMap(
     isAuthenticated,
@@ -252,16 +340,16 @@ const MapRegister = () => {
   );
 
   useEffect(() => {
-    // Handle search input update when formData changes
-    if (formData.address) {
-      setSearchInput(formData.address);
+    // Handle search input update when formResponse changes
+    if (formResponse.address) {
+      setSearchInput(formResponse.address);
       setTimeout(() => {
         if (mapInstance.current) {
-          handleSearch(formData.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
+          handleSearch(formResponse.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
         }
       }, 1000);
     }
-  }, [formData.address, mapInstance]);
+  }, [formResponse.address, mapInstance]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
@@ -336,9 +424,9 @@ const MapRegister = () => {
       nik: nik,
       idpetak: p.petak_id,
       luas: p.area,
-      musim_tanam: formData.musimTanam || 'MT1', // Default value if not provided
-      tgl_tanam: formData.tanggalTanam || new Date().toISOString().split('T')[0], // Default to today
-      tgl_panen: formData.tanggalPanen || new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0], // Default to 90 days from now
+      musim_tanam: formResponse.musimTanam || 'MT1', // Default value if not provided
+      tgl_tanam: formResponse.tanggalTanam || new Date().toISOString().split('T')[0], // Default to today
+      tgl_panen: formResponse.tanggalPanen || new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0], // Default to 90 days from now
       geometry: p.geometry,
     }));
 
@@ -506,7 +594,7 @@ const MapRegister = () => {
     
     try {
       const result = await dispatch(getPetakUser(nik));
-      console.log('Petak data refreshed from database:', result?.data?.data?.length || 0, 'records');
+      //console.log('Petak data refreshed from database:', result?.data?.data?.length || 0, 'records');
       return result;
     } catch (error) {
       console.error('Error refreshing petak data:', error);
@@ -538,7 +626,7 @@ const MapRegister = () => {
 
     // Refresh data every 30 seconds to ensure real-time validation
     const refreshInterval = setInterval(() => {
-      console.log('Periodic refresh of petak data...');
+      //console.log('Periodic refresh of petak data...');
       refreshPetakData();
     }, 30000); // 30 seconds
 

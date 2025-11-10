@@ -1,22 +1,74 @@
 import axios from "../api/axios";
 
-const getAnggota = (idkelompok) => {
-  return axios.get(`/get-anggota/${idkelompok}`);
+const getAnggota = (idkelompok, token) => {
+  const config = {
+    params: {}
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/get-anggota/${idkelompok}`, config);
 };
 
-const getAnggotaDisetujui = (idkelompok) => {
-  return axios.get(`/get-anggota-disetujui/${idkelompok}`);
+const getAnggotaKlaim = (nopolis, token) => {
+  const config = {
+    params: {
+      nopolis
+    }
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/get-anggota-klaim`, config);
 };
 
-const getAnggotaKlaim = (idkelompok,idklaim) => {
-  return axios.get(`/get-anggota-klaim/${idkelompok}/${idklaim}`);
+const detailAnggotaKlaim = (nik, nopolis, token) => {
+  const config = {
+    params: {
+      nik,
+      nopolis
+    }
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/detail-anggota-klaim`, config);
 };
 
+const getDetailPeserta = (idkelompok, nik, token) => {
+  const config = {
+    params: {
+      idkelompok,
+      nik
+    }
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/get-detail-peserta`, config);
+};
 
 const anggotaService = {
   getAnggota,
   getAnggotaKlaim,
-  getAnggotaDisetujui
+  detailAnggotaKlaim,
+  getDetailPeserta
 };
 
 export default anggotaService;

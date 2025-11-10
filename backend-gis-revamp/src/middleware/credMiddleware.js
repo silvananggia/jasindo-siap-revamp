@@ -1,17 +1,17 @@
-// Middleware to extract cred from request (from postMessage)
+// Middleware to extract token from request (from postMessage)
 // Supports both GET (query parameter) and POST (request body)
-const extractCred = (req, res, next) => {
-  // Get cred from query parameter (GET request)
-  const credFromQuery = req.query?.cred;
+const extractToken = (req, res, next) => {
+  // Get token from query parameter (GET request)
+  const tokenFromQuery = req.query?.token;
   
-  // Get cred from request body (POST request)
-  const credFromBody = req.body?.cred;
+  // Get token from request body (POST request)
+  const tokenFromBody = req.body?.token;
   
-  // Set req.cred from query param or body (query param takes precedence for GET)
-  req.cred = credFromQuery || credFromBody || null;
+  // Set req.token from query param or body (query param takes precedence for GET)
+  req.token = tokenFromQuery || tokenFromBody || null;
   
   next();
 };
 
-module.exports = extractCred;
+module.exports = extractToken;
 

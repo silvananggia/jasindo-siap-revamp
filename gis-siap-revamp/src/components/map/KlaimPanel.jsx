@@ -41,13 +41,26 @@ const DataPanel = ({
   const [hoveredId, setHoveredId] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
 
+  const [token, setToken] = useState(null);
+
+  // Listen for token from postMessage
+  useEffect(() => {
+    const handleMessage = (e) => {
+      if (e.data && e.data.token) {
+        setToken(e.data.token);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Fetch default list when component mounts
   useEffect(() => {
-    if (formData.idKelompok && formData.noPolis) {
-      dispatch(getAnggota(formData.idKelompok));
+    if (formData.idKelompok && formData.noPolis && token) {
+      dispatch(getAnggota(formData.idKelompok, token));
       console.log("KlaimPanel - anggotalist:", anggotalist);
     }
-  }, [dispatch, formData.idKelompok, formData.noPolis]);
+  }, [dispatch, formData.idKelompok, formData.noPolis, token]);
 
   // Debug effect to log anggotalist changes
   useEffect(() => {
@@ -70,11 +83,12 @@ const DataPanel = ({
   }, [anggotalist]);
 
   const handleReloadAnggota = () => {
-    if (debugInfo.idkelompok && debugInfo.idklaim) {
-      console.log("Reloading anggota data with idkelompok:", debugInfo.idkelompok, "idklaim:", debugInfo.idklaim);
-      dispatch(getAnggotaKlaim(debugInfo.idkelompok, debugInfo.idklaim));
+    const nopolis = formData.noPolis || debugInfo.nopolis;
+    if (nopolis && token) {
+      console.log("Reloading anggota data with nopolis:", nopolis);
+      dispatch(getAnggotaKlaim(nopolis, token));
     } else {
-      console.log("Cannot reload anggota - missing idkelompok or idklaim");
+      console.log("Cannot reload anggota - missing nopolis or token");
     }
   };
 

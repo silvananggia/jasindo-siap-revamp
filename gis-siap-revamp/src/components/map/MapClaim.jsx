@@ -15,11 +15,12 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
-import { useURLParams } from '../../hooks/useURLParams';
+import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { createKlaim, getKlaimID, deleteKlaim, getKlaimUser } from '../../actions/klaimActions';
+import { detailAnggotaKlaim } from '../../actions/anggotaActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
 import Spinner from '../Spinner/Loading-spinner';
@@ -29,14 +30,25 @@ import LayerPanel from './LayerPanel';
 const MapRegister = () => {
   
   const dispatch = useDispatch();
+  const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
 
-  const { formData, setFormData, isDataLoaded } = useURLParams();
+  const [token, setToken] = useState(null);
+  const [detailAnggotaData, setDetailAnggotaData] = useState(null);
+  const [nik, setNik] = useState('');
+  const [noPolis, setNoPolis] = useState('');
+  
+  // Helper function to get data from detailAnggotaKlaim response
+  const getDetailData = () => {
+    if (!detailAnggotaData) return null;
+    // Response structure: { success: true, nik, nopolis, data: { status: 200, message: "Success", data: {...}, timestamp: "..." } }
+    return detailAnggotaData.data?.data || detailAnggotaData.data || null;
+  };
 
-  const [searchInput, setSearchInput] = useState(formData.address);
+  const [searchInput, setSearchInput] = useState('');
   const [selectedPercils, setSelectedPercils] = useState([]);
   const [autocomplete, setAutocomplete] = useState(null);
   const [autocompleteService, setAutocompleteService] = useState(null);
@@ -81,13 +93,16 @@ const MapRegister = () => {
 
   const handlePercilSelect = useCallback(async (percilData) => {
     try {
+      const detailData = getDetailData();
+      const jmlPetak = detailData?.jmlPetak || 0;
+      
       // Check if user has already reached the maximum number of petak allowed
       const totalRegisteredKlaim = (listKlaim || []).length;
       const totalSelectedPetak = selectedPercils.length;
       const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
       
-    /*   if (totalPetak >= formData.jmlPetak) {
-        setAlertMessage(`Tidak dapat menambah petak lagi. Total petak (terdaftar: ${totalRegisteredKlaim} + terpilih: ${totalSelectedPetak} = ${totalPetak}) sudah mencapai batas maksimum (${formData.jmlPetak})`);
+    /*   if (totalPetak >= jmlPetak) {
+        setAlertMessage(`Tidak dapat menambah petak lagi. Total petak (terdaftar: ${totalRegisteredKlaim} + terpilih: ${totalSelectedPetak} = ${totalPetak}) sudah mencapai batas maksimum (${jmlPetak})`);
         setAlertOpen(true);
         return;
       } */
@@ -110,7 +125,7 @@ const MapRegister = () => {
           const totalRegisteredKlaim = (listKlaim || []).length;
           const totalSelectedPetak = updated.length;
           const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
-          const isLimitReached = totalPetak >= formData.jmlPetak;
+          const isLimitReached = totalPetak >= jmlPetak;
           
           
           polygonLayerRef.current.setStyle(getPercilStyle(updated, lockedIDs, isLimitReached));
@@ -126,40 +141,53 @@ const MapRegister = () => {
         text: 'An error occurred while processing.',
       });
     }
-  }, [dispatch, listKlaim, selectedPercils, formData.jmlPetak]);
+  }, [dispatch, listKlaim, selectedPercils, detailAnggotaData]);
 
   const { mapRef, mapInstance, polygonLayerRef, basemapLayerRef } = useMap(
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
-    `function_zxy_id_petakuser/{z}/{x}/{y}?id=${formData.nik}`,
+    nik ? `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}` : "",
   );
+
+  // Initialize nik and noPolis from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const nikFromUrl = urlParams.get('nik') || '';
+    const noPolisFromUrl = urlParams.get('noPolis') || urlParams.get('nopolis') || '';
+    
+    if (nikFromUrl) {
+      setNik(nikFromUrl);
+    }
+    if (noPolisFromUrl) {
+      setNoPolis(noPolisFromUrl);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const handleMessage = (e) => {
-      // console.log("MapRegister - Received message:", e.data);
-      // console.log("MapRegister - Message origin:", e.origin);
+      if (e.data && e.data.token) {
+        setToken(e.data.token);
+      }
       
       if (e.data && e.data.nik) {
-        // console.log("MapRegister - Valid message received, updating formData with:", e.data);
-        setFormData(e.data);
-        setSearchInput(e.data.address);
-        // console.log("MapRegister - formData and searchInput updated");
+        if (e.data.nik) setNik(e.data.nik);
+        if (e.data.noPolis) setNoPolis(e.data.noPolis);
         
-        setTimeout(() => {
-          if (mapInstance.current) {
-            // console.log("MapRegister - Triggering search for address:", e.data.address);
-            handleSearch(e.data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
-          }
-        }, 1000);
-      } else {
-        console.log("MapRegister - Invalid message format:", e.data);
+        if (e.data.address) {
+          setSearchInput(e.data.address);
+          setTimeout(() => {
+            if (mapInstance.current) {
+              handleSearch(e.data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
+            }
+          }, 1000);
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mapInstance, setFormData]);
+  }, [mapInstance]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
@@ -169,8 +197,8 @@ const MapRegister = () => {
   }, [selectedPercils]);
 
   useEffect(() => {
-    // First check if all required data is loaded
-    if (!isDataLoaded) {
+    const detailData = getDetailData();
+    if (!detailData) {
       setIsValid(false);
       return;
     }
@@ -184,15 +212,16 @@ const MapRegister = () => {
     const totalRegisteredKlaim = (listKlaim || []).length;
     const totalSelectedPetak = selectedPercils.length;
     const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
+    const jmlPetak = detailData.jmlPetak || 0;
     
-    if (totalPetak > formData.jmlPetak) {
-      setAlertMessage(`Total petak (terdaftar: ${totalRegisteredKlaim} + terpilih: ${totalSelectedPetak} = ${totalPetak}) tidak dapat lebih dari ${formData.jmlPetak}`);
+    if (totalPetak > jmlPetak) {
+      setAlertMessage(`Total petak (terdaftar: ${totalRegisteredKlaim} + terpilih: ${totalSelectedPetak} = ${totalPetak}) tidak dapat lebih dari ${jmlPetak}`);
       setAlertOpen(true);
       setIsValid(false);
       return;
     }
 
-    const luasLahanFloat = parseFloat(formData.luasLahan);
+    const luasLahanFloat = parseFloat(detailData.luasLahan || 0);
     const areaLimit = luasLahanFloat + (luasLahanFloat * 0.25);
     
     if (totalArea > areaLimit) {
@@ -202,7 +231,7 @@ const MapRegister = () => {
     } else {
       setIsValid(true);
     }
-  }, [selectedPercils, totalArea, formData.jmlPetak, formData.luasLahan, listKlaim, isDataLoaded, klaimLoading]);
+  }, [selectedPercils, totalArea, detailAnggotaData, listKlaim, klaimLoading]);
 
   useEffect(() => {
     if (polygonLayerRef.current) {
@@ -211,23 +240,48 @@ const MapRegister = () => {
     }
   }, [isPolygonVisible, polygonOpacity]);
 
-  // Fetch klaim data when component mounts or formData changes
+  // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (formData.nik && formData.noPolis) {
-      dispatch(getKlaimUser(formData.nik, formData.noPolis));
+    if (nik && noPolis && token) {
+      //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
+      dispatch(detailAnggotaKlaim(nik, noPolis, token))
+        .then((response) => {
+         // console.log('detailAnggotaKlaim response:', response);
+          if (response) {
+            setDetailAnggotaData(response);
+            // Response structure: { success: true, nik, nopolis, data: { status: 200, message: "Success", data: {...}, timestamp: "..." } }
+            const data = response.data?.data || null;
+            if (data && data.address) {
+              setSearchInput(data.address);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching detailAnggotaKlaim:', error);
+        });
     }
-  }, [formData.nik, formData.noPolis, dispatch]);
+  }, [nik, noPolis, token, dispatch]);
+
+  // Fetch klaim data when component mounts or nik/noPolis changes
+  useEffect(() => {
+    if (nik && noPolis) {
+      dispatch(getKlaimUser(nik, noPolis));
+    }
+  }, [nik, noPolis, dispatch]);
 
   // Style registered klaim in the main layer
   useEffect(() => {
     if (!polygonLayerRef.current) return;
+    
+    const detailData = getDetailData();
+    const jmlPetak = detailData?.jmlPetak || 0;
     
     const currentListKlaim = listKlaim || [];
     const lockedIDs = currentListKlaim.map(p => p.idpetak);
     const totalRegisteredKlaim = currentListKlaim.length;
     const totalSelectedPetak = selectedPercils.length;
     const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
-    const isLimitReached = totalPetak >= formData.jmlPetak;
+    const isLimitReached = totalPetak >= jmlPetak;
     
     polygonLayerRef.current.setStyle(getPercilStyle(selectedPercils, lockedIDs, isLimitReached));
     polygonLayerRef.current.changed();
@@ -241,7 +295,7 @@ const MapRegister = () => {
         mapElement.style.cursor = 'pointer';
       }
     }
-  }, [selectedPercils, listKlaim, formData.jmlPetak, mapInstance]);
+  }, [selectedPercils, listKlaim, detailAnggotaData, mapInstance]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -285,13 +339,23 @@ const MapRegister = () => {
   };
 
   const handleSimpan = async () => {
+    const detailData = getDetailData();
+    if (!nik || !noPolis) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Data nik atau noPolis tidak tersedia.",
+      });
+      return;
+    }
+
     const payload = selectedPercils.map(p => ({
-      nik: formData.nik,
-      nopolis: formData.noPolis,
+      nik,
+      nopolis: noPolis,
       idpetak: p.id,
       luas: p.area,
       geometry: p.geometry,
-      tglKejadian: formData.tglKejadian,
+      tglKejadian: detailData?.tgl_kejadian || detailData?.tglKejadian || '',
     }));
 
     try {
@@ -301,7 +365,7 @@ const MapRegister = () => {
       setSelectedPercils([]);
       
       // Refresh the klaim list to show newly saved klaim in "Lahan Terdaftar"
-      await dispatch(getKlaimUser(formData.nik, formData.noPolis));
+      await dispatch(getKlaimUser(nik, noPolis));
       
       Swal.fire({
         icon: "success",
@@ -324,7 +388,9 @@ const MapRegister = () => {
       await dispatch(deleteKlaim(klaimId));
       // console.log('MapClaim.handleDeleteKlaim: deleteKlaim completed');
       // Refresh the klaim list after deletion
-      await dispatch(getKlaimUser(formData.nik, formData.noPolis));
+      if (nik && noPolis) {
+        await dispatch(getKlaimUser(nik, noPolis));
+      }
       // console.log('MapClaim.handleDeleteKlaim: getKlaimUser completed');
     } catch (error) {
       console.error("Error deleting klaim:", error);
@@ -332,11 +398,11 @@ const MapRegister = () => {
     }
   };
 
-  // Update polygon layer when formData changes
+  // Update polygon layer when nik changes
   useEffect(() => {
-    if (!polygonLayerRef.current || !mapInstance.current || !formData.nik) return;
+    if (!polygonLayerRef.current || !mapInstance.current || !nik) return;
 
-    const newTileUrl = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${formData.nik}`;
+    const newTileUrl = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}`;
     setTileUrl(newTileUrl);
 
     // Create new source with updated URL
@@ -348,7 +414,7 @@ const MapRegister = () => {
     // Update the layer's source
     polygonLayerRef.current.setSource(newSource);
     polygonLayerRef.current.changed();
-  }, [formData.idkec, formData.nik, formData.idkab, mapInstance, polygonLayerRef]);
+  }, [nik, mapInstance, polygonLayerRef]);
 
   useAuthListener();
 
@@ -400,22 +466,57 @@ const MapRegister = () => {
             <Tab label="Layers" icon={<LayersIcon />} iconPosition="start" />
           </Tabs>
 
-          {tabValue === 0 && (
-            <DataPanel
-              formData={formData}
-              selectedPercils={selectedPercils}
-              setSelectedPercils={setSelectedPercils}
-              totalArea={totalArea}
-              isValid={isValid}
-              onSave={handleSimpan}
-              polygonLayerRef={polygonLayerRef}
-              listPetak={listKlaim}
-              source="MapClaim"
-              isLoading={klaimLoading}
-              onDeletePetak={handleDeleteKlaim}
-              mapInstance={mapInstance}
-            />
-          )}
+          {tabValue === 0 && (() => {
+            const detailData = getDetailData();
+            const formDataForPanel = detailData ? {
+              nik: nik || '',
+              nama: detailData.nama || '',
+              address: detailData.address || '',
+              idkab: detailData.idkab || '',
+              idkec: detailData.idkec || '',
+              jmlPetak: detailData.jmlPetak || 0,
+              luasLahan: detailData.luasLahan || 0,
+              noPolis: noPolis || '',
+              idKelompok: '',
+              idKlaim: '',
+              tglKejadian: detailData.tgl_kejadian || detailData.tglKejadian || '',
+              musimTanam: detailData.musimTanam || '',
+              tanggalTanam: detailData.tanggalTanam || '',
+              tanggalPanen: detailData.tanggalPanen || ''
+            } : {
+              nik: nik || '',
+              nama: '',
+              address: '',
+              idkab: '',
+              idkec: '',
+              jmlPetak: 0,
+              luasLahan: 0,
+              noPolis: noPolis || '',
+              idKelompok: '',
+              idKlaim: '',
+              tglKejadian: '',
+              musimTanam: '',
+              tanggalTanam: '',
+              tanggalPanen: ''
+            };
+            
+            return (
+              <DataPanel
+                formData={formDataForPanel}
+                selectedPercils={selectedPercils}
+                setSelectedPercils={setSelectedPercils}
+                totalArea={totalArea}
+                isValid={isValid}
+                onSave={handleSimpan}
+                polygonLayerRef={polygonLayerRef}
+                listPetak={listKlaim}
+                source="MapClaim"
+                isLoading={klaimLoading}
+                onDeletePetak={handleDeleteKlaim}
+                mapInstance={mapInstance}
+              />
+            );
+          })()}
 
           {tabValue === 1 && (
             <LayerPanel

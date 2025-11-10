@@ -6,11 +6,11 @@ export const useAuthListener = () => {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // Listen for postMessage with cred from index.php
+    // Listen for postMessage with token from index.php
     const handleMessage = (e) => {
-      if (e.data && e.data.cred) {
-        // Trigger auth check with cred from postMessage
-        dispatch(checkAuth(e.data.cred));
+      if (e.data && e.data.token) {
+        // Trigger auth check with token from postMessage
+        dispatch(checkAuth(e.data.token));
       }
     };
 

@@ -4,7 +4,8 @@ const anggotaController = require('../controllers/anggota.controller');
 
 
 router.get('/get-anggota/:id', anggotaController.getAnggota);
-router.get('/get-anggota-disetujui/:id', anggotaController.getAnggotaDisetujui);
-router.get('/get-anggota-klaim/:idkelompok/:idklaim', anggotaController.getAnggotaKlaim);
+router.get('/get-anggota-klaim', anggotaController.getAnggotaKlaim);
+router.get('/detail-anggota-klaim', anggotaController.detailAnggotaKlaim);
+router.get('/get-detail-peserta', anggotaController.getDetailPeserta);
 
 module.exports = router;

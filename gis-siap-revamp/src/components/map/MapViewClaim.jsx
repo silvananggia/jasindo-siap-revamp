@@ -15,11 +15,12 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
-import { useURLParams } from '../../hooks/useURLParams';
+import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { getKlaimUser, deleteKlaim } from '../../actions/klaimActions';
+import { detailAnggotaKlaim } from '../../actions/anggotaActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
 import Spinner from '../Spinner/Loading-spinner';
@@ -29,14 +30,25 @@ import LayerPanel from './LayerPanel';
 const MapViewClaim = () => {
   
   const dispatch = useDispatch();
+  const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
 
-  const { formData, setFormData } = useURLParams();
+  const [token, setToken] = useState(null);
+  const [detailAnggotaData, setDetailAnggotaData] = useState(null);
+  const [nik, setNik] = useState('');
+  const [noPolis, setNoPolis] = useState('');
+  
+  // Helper function to get data from detailAnggotaKlaim response
+  const getDetailData = () => {
+    if (!detailAnggotaData) return null;
+    // Response structure: { success: true, nik, nopolis, data: { status: 200, message: "Success", data: {...}, timestamp: "..." } }
+    return detailAnggotaData.data?.data || detailAnggotaData.data || null;
+  };
 
-  const [searchInput, setSearchInput] = useState(formData.address);
+  const [searchInput, setSearchInput] = useState('');
   const [selectedPercils, setSelectedPercils] = useState([]);
   const [autocomplete, setAutocomplete] = useState(null);
   const [autocompleteService, setAutocompleteService] = useState(null);
@@ -101,36 +113,48 @@ const MapViewClaim = () => {
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
-    `function_zxy_id_petakuserklaim/{z}/{x}/{y}?id=${formData.nik}`,
+    nik ? `function_zxy_id_petakuserklaim/{z}/{x}/{y}?id=${nik}` : "",
   );
+
+  // Initialize nik, idKelompok, and noPolis from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const nikFromUrl = urlParams.get('nik') || '';
+    const idKelompokFromUrl = urlParams.get('idkelompok') || '';
+    const noPolisFromUrl = urlParams.get('noPolis') || urlParams.get('nopolis') || '';
+    
+    if (nikFromUrl) {
+      setNik(nikFromUrl);
+    }
+    if (noPolisFromUrl) {
+      setNoPolis(noPolisFromUrl);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const handleMessage = (e) => {
-      console.log("MapViewClaim - Received message:", e.data);
-      console.log("MapViewClaim - Message origin:", e.origin);
+      if (e.data && e.data.token) {
+        setToken(e.data.token);
+      }
       
       if (e.data && e.data.nik) {
-        console.log("MapViewClaim - Valid message received, updating formData with:", e.data);
-        console.log("MapViewClaim - Full message keys:", Object.keys(e.data));
-        console.log("MapViewClaim - noPolis in message:", e.data.noPolis);
-        setFormData(e.data);
-        setSearchInput(e.data.address);
-        console.log("MapViewClaim - formData and searchInput updated");
+        if (e.data.nik) setNik(e.data.nik);
+        if (e.data.noPolis) setNoPolis(e.data.noPolis);
         
-        setTimeout(() => {
-          if (mapInstance.current) {
-            console.log("MapViewClaim - Triggering search for address:", e.data.address);
-            handleSearch(e.data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
-          }
-        }, 1000);
-      } else {
-        console.log("MapViewClaim - Invalid message format:", e.data);
+        if (e.data.address) {
+          setSearchInput(e.data.address);
+          setTimeout(() => {
+            if (mapInstance.current) {
+              handleSearch(e.data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
+            }
+          }, 1000);
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mapInstance, setFormData]);
+  }, [mapInstance]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
@@ -146,41 +170,39 @@ const MapViewClaim = () => {
     }
   }, [isPolygonVisible, polygonOpacity]);
 
-  // Fetch klaim data when component mounts or formData changes
+  // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    console.log('MapViewClaim - Fetching klaim data with:', { nik: formData.nik, noPolis: formData.noPolis });
-    
-    // Try to get noPolis from URL parameters as fallback
-    const urlParams = new URLSearchParams(window.location.search);
-    const noPolisFromUrl = urlParams.get('noPolis');
-    const finalNoPolis = formData.noPolis || noPolisFromUrl;
-    
-    console.log('MapViewClaim - noPolis sources:', { 
-      fromFormData: formData.noPolis, 
-      fromUrl: noPolisFromUrl, 
-      final: finalNoPolis 
-    });
-    
-    if (formData.nik && finalNoPolis) {
-      dispatch(getKlaimUser(formData.nik, finalNoPolis));
-    } else {
-      console.log('MapViewClaim - Missing required parameters:', { 
-        nik: formData.nik, 
-        noPolis: finalNoPolis 
-      });
-      
-      // Show user-friendly message about missing noPolis
-      if (formData.nik && !finalNoPolis) {
-        console.log('MapViewClaim - NoPolis is required but not available');
-        // You could dispatch an action to show a user message here
-      }
+    if (nik && noPolis && token) {
+      //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
+      dispatch(detailAnggotaKlaim(nik, noPolis, token))
+        .then((response) => {
+        //  console.log('detailAnggotaKlaim response:', response);
+          if (response) {
+            setDetailAnggotaData(response);
+            // Response structure: { success: true, nik, nopolis, data: { status: 200, message: "Success", data: {...}, timestamp: "..." } }
+            const data = response.data?.data || null;
+            if (data && data.address) {
+              setSearchInput(data.address);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching detailAnggotaKlaim:', error);
+        });
     }
-  }, [formData.nik, formData.noPolis, dispatch]);
+  }, [nik, noPolis, token, dispatch]);
+
+  // Fetch klaim data when component mounts or nik/noPolis changes
+  useEffect(() => {
+    if (nik && noPolis) {
+      dispatch(getKlaimUser(nik, noPolis));
+    }
+  }, [nik, noPolis, dispatch]);
 
   // Debug: Log klaim data
   useEffect(() => {
-    console.log('MapViewClaim - listKlaim updated:', listKlaim);
-    console.log('MapViewClaim - klaimLoading:', klaimLoading);
+    //console.log('MapViewClaim - listKlaim updated:', listKlaim);
+   // console.log('MapViewClaim - klaimLoading:', klaimLoading);
   }, [listKlaim, klaimLoading]);
 
   // Style registered klaim in the main layer
@@ -247,7 +269,9 @@ const MapViewClaim = () => {
       await dispatch(deleteKlaim(klaimId));
       // console.log('MapViewClaim.handleDeleteKlaim: deleteKlaim completed');
       // Refresh the klaim list after deletion
-      await dispatch(getKlaimUser(formData.nik, formData.noPolis));
+      if (nik && noPolis) {
+        await dispatch(getKlaimUser(nik, noPolis));
+      }
       // console.log('MapViewClaim.handleDeleteKlaim: getKlaimUser completed');
     } catch (error) {
       // console.error("Error deleting klaim:", error);
@@ -255,11 +279,11 @@ const MapViewClaim = () => {
     }
   };
 
-  // Update polygon layer when formData changes
+  // Update polygon layer when nik changes
   useEffect(() => {
-    if (!polygonLayerRef.current || !mapInstance.current || !formData.nik) return;
+    if (!polygonLayerRef.current || !mapInstance.current || !nik) return;
 
-    const tileUrlPath = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${formData.nik}`;
+    const tileUrlPath = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}`;
     setTileUrl(tileUrlPath);
 
     // Create new source with updated URL
@@ -271,7 +295,7 @@ const MapViewClaim = () => {
     // Update the layer's source
     polygonLayerRef.current.setSource(newSource);
     polygonLayerRef.current.changed();
-  }, [formData.idkec, formData.nik, formData.idkab, mapInstance, polygonLayerRef]);
+  }, [nik, mapInstance, polygonLayerRef]);
 
   useAuthListener();
 
@@ -323,22 +347,57 @@ const MapViewClaim = () => {
             <Tab label="Layers" icon={<LayersIcon />} iconPosition="start" />
           </Tabs>
 
-          {tabValue === 0 && (
-            <DataPanel
-              formData={formData}
-              selectedPercils={selectedPercils}
-              setSelectedPercils={setSelectedPercils}
-              totalArea={totalArea}
-              isValid={isValid}
-              onSave={() => {}} // No save functionality in view mode
-              polygonLayerRef={polygonLayerRef}
-              listPetak={listKlaim}
-              source="MapViewClaim"
-              isLoading={klaimLoading}
-              onDeletePetak={handleDeleteKlaim}
-              mapInstance={mapInstance}
-            />
-          )}
+          {tabValue === 0 && (() => {
+            const detailData = getDetailData();
+            const formDataForPanel = detailData ? {
+              nik: nik || '',
+              nama: detailData.nama || '',
+              address: detailData.address || '',
+              idkab: detailData.idkab || '',
+              idkec: detailData.idkec || '',
+              jmlPetak: detailData.jmlPetak || 0,
+              luasLahan: detailData.luasLahan || 0,
+              noPolis: noPolis || '',
+              idKelompok: '',
+              idKlaim: '',
+              tglKejadian: detailData.tgl_kejadian || detailData.tglKejadian || '',
+              musimTanam: detailData.musimTanam || '',
+              tanggalTanam: detailData.tanggalTanam || '',
+              tanggalPanen: detailData.tanggalPanen || ''
+            } : {
+              nik: nik || '',
+              nama: '',
+              address: '',
+              idkab: '',
+              idkec: '',
+              jmlPetak: 0,
+              luasLahan: 0,
+              noPolis: noPolis || '',
+              idKelompok: '',
+              idKlaim: '',
+              tglKejadian: '',
+              musimTanam: '',
+              tanggalTanam: '',
+              tanggalPanen: ''
+            };
+            
+            return (
+              <DataPanel
+                formData={formDataForPanel}
+                selectedPercils={selectedPercils}
+                setSelectedPercils={setSelectedPercils}
+                totalArea={totalArea}
+                isValid={isValid}
+                onSave={() => {}} // No save functionality in view mode
+                polygonLayerRef={polygonLayerRef}
+                listPetak={listKlaim}
+                source="MapViewClaim"
+                isLoading={klaimLoading}
+                onDeletePetak={handleDeleteKlaim}
+                mapInstance={mapInstance}
+              />
+            );
+          })()}
 
           {tabValue === 1 && (
             <LayerPanel
