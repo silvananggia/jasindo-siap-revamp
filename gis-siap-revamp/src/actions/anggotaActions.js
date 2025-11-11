@@ -10,7 +10,7 @@ import AnggotaService from "../services/anggotaService";
 export const getAnggota = (idkelompok, token) => async (dispatch) => {
     try {
         const res = await AnggotaService.getAnggota(idkelompok, token);
-        console.log("getAnggota - res:", res.data);
+        //console.log("getAnggota - res:", res.data);
         dispatch({
             type: GET_ANGGOTA,
             payload: res.data,
