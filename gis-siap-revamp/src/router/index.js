@@ -16,6 +16,11 @@ const MapViewClaim = lazy(() => import('../components/map/MapViewClaim'));
 function MyRouter() {
     return (
         <Routes>
+            <Route path='/' element={
+                <Suspense fallback={<Spinner className="content-loader" />}>
+                    <MapRegister />
+                </Suspense>
+            } />
             <Route path='/map-register' element={
                 <Suspense fallback={<Spinner className="content-loader" />}>
                     <MapRegister />
