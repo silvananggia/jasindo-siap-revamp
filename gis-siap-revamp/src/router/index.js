@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import Spinner from '../components/Spinner/Loading-spinner';
 
 // Use lazy for importing your components
+const MapIndex = lazy(() => import('../components/map/MapIndex'));
 const MapRegister = lazy(() => import('../components/map/MapRegister'));
 const MapView = lazy(() => import('../components/map/MapView'));
 const MapKlaim = lazy(() => import('../components/map/MapClaim'));
@@ -18,7 +19,7 @@ function MyRouter() {
         <Routes>
             <Route path='/' element={
                 <Suspense fallback={<Spinner className="content-loader" />}>
-                    <MapRegister />
+                    <MapIndex />
                 </Suspense>
             } />
             <Route path='/map-register' element={
