@@ -341,7 +341,7 @@ const MapAnggotaKlaim = () => {
     } else {
      // console.log('Not dispatching getAnggotaKlaim - missing:', { nopolis: !nopolis, token: !token });
     }
-  },[location.search, anggotalist, currentAnggotaIndex, token]);
+  },[location.search, currentAnggotaIndex, token]);
 
   // Update search input from response
   useEffect(() => {

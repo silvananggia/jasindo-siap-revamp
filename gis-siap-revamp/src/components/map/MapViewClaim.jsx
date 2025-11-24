@@ -283,7 +283,7 @@ const MapViewClaim = () => {
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current || !nik) return;
 
-    const tileUrlPath = `function_zxy_petakuser_by_nik/{z}/{x}/{y}?nik=${nik}`;
+    const tileUrlPath = `function_zxy_id_petakuserklaim/{z}/{x}/{y}?id=${nik}`;
     setTileUrl(tileUrlPath);
 
     // Create new source with updated URL

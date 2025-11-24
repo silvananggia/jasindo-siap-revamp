@@ -418,7 +418,7 @@ const MapAnalytic = () => {
         // Show the petak layer and update the map tile URL to show petak data for the selected NIK
         setPetakLayerVisible(true);
         if (mapInstance.current && polygonLayerRef.current) {
-          const newTileUrl = `function_zxy_id_petakuserklaim/{z}/{x}/{y}?id=${anggota.NIK}&nopolis=${formData.noPolis}`;
+          const newTileUrl = `function_zxy_petakuser_by_nikklaim/{z}/{x}/{y}?id=${anggota.NIK}&nopolis=${formData.noPolis}`;
           const newSource = new VectorTileSource({
             format: new MVT(),
             url: `${process.env.REACT_APP_TILE_URL}/${newTileUrl}`,
