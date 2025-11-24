@@ -147,7 +147,7 @@ const MapRegister = () => {
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
-    nik ? `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}` : "",
+    nik ? `function_zxy_petakuser_by_nik/{z}/{x}/{y}?nik=${nik}` : "",
   );
 
   // Initialize nik and noPolis from URL params
@@ -402,7 +402,7 @@ const MapRegister = () => {
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current || !nik) return;
 
-    const newTileUrl = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}`;
+    const newTileUrl = `function_zxy_petakuser_by_nik/{z}/{x}/{y}?nik=${nik}`;
     setTileUrl(newTileUrl);
 
     // Create new source with updated URL

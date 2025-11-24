@@ -152,7 +152,7 @@ const MapAnalytic = () => {
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
-    petakLayerVisible ? `function_zxy_id_petakuser/{z}/{x}/{y}?id=${formData.nik}` : ""
+    petakLayerVisible ? `function_zxy_petakuser_by_nik/{z}/{x}/{y}?id=${formData.nik}` : ""
   );
 
   // Initialize formData from URL params
@@ -374,7 +374,7 @@ const MapAnalytic = () => {
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current || !formData.nik) return;
 
-    const tileUrlPath = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${formData.nik}`;
+    const tileUrlPath = `function_zxy_petakuser_by_nik/{z}/{x}/{y}?id=${formData.nik}`;
     setTileUrl(tileUrlPath);
 
     // Create new source with updated URL
@@ -639,7 +639,7 @@ const MapAnalytic = () => {
         // Show the petak layer and update the map tile URL to show petak data for the selected NIK
         setPetakLayerVisible(true);
         if (mapInstance.current && polygonLayerRef.current) {
-          const newTileUrl = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${anggota.nik}`;
+          const newTileUrl = `function_zxy_petakuser_by_nik/{z}/{x}/{y}?id=${anggota.nik}`;
           const newSource = new VectorTileSource({
             format: new MVT(),
             url: `${process.env.REACT_APP_TILE_URL}/${newTileUrl}`,
