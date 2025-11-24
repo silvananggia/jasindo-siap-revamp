@@ -221,7 +221,7 @@ const MapRegister = () => {
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
-    nik ? `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}` : "",
+    nik ? `function_zxy_petakuser_by_nik/{z}/{x}/{y}?nik=${nik}` : "",
   );
 
   useEffect(() => {
@@ -343,7 +343,7 @@ const MapRegister = () => {
       return;
     }
 
-    const newTileUrl = `function_zxy_id_petakuser/{z}/{x}/{y}?id=${nik}`;
+    const newTileUrl = `function_zxy_petakuser_by_nik/{z}/{x}/{y}?nik=${nik}`;
     //console.log("MapView - Updating tile URL:", newTileUrl);
     
     // Check if REACT_APP_TILE_URL is defined
