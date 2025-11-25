@@ -21,6 +21,7 @@ import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { createKlaim, getKlaimID, deleteKlaim, getKlaimUser } from '../../actions/klaimActions';
 import { detailAnggotaKlaim } from '../../actions/anggotaActions';
+import { setToken as setTokenAction } from '../../actions/authActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
 import Spinner from '../Spinner/Loading-spinner';
@@ -167,7 +168,9 @@ const MapRegister = () => {
   useEffect(() => {
     const handleMessage = (e) => {
       if (e.data && e.data.token) {
-        setToken(e.data.token);
+        const tokenValue = e.data.token;
+        setToken(tokenValue); // Set local state
+        dispatch(setTokenAction(tokenValue)); // Store in Redux for axios interceptor
       }
       
       if (e.data && e.data.nik) {
@@ -187,7 +190,7 @@ const MapRegister = () => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mapInstance]);
+  }, [mapInstance, dispatch]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
