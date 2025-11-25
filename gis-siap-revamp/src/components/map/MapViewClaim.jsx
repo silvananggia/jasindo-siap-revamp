@@ -21,6 +21,7 @@ import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { getKlaimUser, deleteKlaim } from '../../actions/klaimActions';
 import { detailAnggotaKlaim } from '../../actions/anggotaActions';
+import { setToken as setTokenAction } from '../../actions/authActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
 import Spinner from '../Spinner/Loading-spinner';
@@ -134,7 +135,9 @@ const MapViewClaim = () => {
   useEffect(() => {
     const handleMessage = (e) => {
       if (e.data && e.data.token) {
-        setToken(e.data.token);
+        const tokenValue = e.data.token;
+        setToken(tokenValue); // Set local state
+        dispatch(setTokenAction(tokenValue)); // Store in Redux for axios interceptor
       }
       
       if (e.data && e.data.nik) {
@@ -154,7 +157,7 @@ const MapViewClaim = () => {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mapInstance]);
+  }, [mapInstance, dispatch]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
@@ -192,12 +195,12 @@ const MapViewClaim = () => {
     }
   }, [nik, noPolis, token, dispatch]);
 
-  // Fetch klaim data when component mounts or nik/noPolis changes
+  // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis) {
+    if (nik && noPolis && token) {
       dispatch(getKlaimUser(nik, noPolis));
     }
-  }, [nik, noPolis, dispatch]);
+  }, [nik, noPolis, token, dispatch]);
 
   // Debug: Log klaim data
   useEffect(() => {
