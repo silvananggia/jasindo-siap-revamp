@@ -1,9 +1,6 @@
 const DEFAULT_GEOSPATIAL_BASE_URL = "http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v1/geospatial";
 
-// Use BASE_URL from .env, fallback to default if not set
-const GEOSPATIAL_BASE_URL = process.env.BASE_URL 
-  ? `${process.env.BASE_URL}/siap-geospatial-service/api/v1/geospatial`
-  : (process.env.GEOSPATIAL_BASE_URL || DEFAULT_GEOSPATIAL_BASE_URL);
+const GEOSPATIAL_BASE_URL = process.env.GEOSPATIAL_BASE_URL || DEFAULT_GEOSPATIAL_BASE_URL;
 
 /**
  * Build a uniform unauthorized payload so consumers get a consistent message.
