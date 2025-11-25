@@ -265,12 +265,12 @@ const MapRegister = () => {
     }
   }, [nik, noPolis, token, dispatch]);
 
-  // Fetch klaim data when component mounts or nik/noPolis changes
+  // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis) {
+    if (nik && noPolis && token) {
       dispatch(getKlaimUser(nik, noPolis));
     }
-  }, [nik, noPolis, dispatch]);
+  }, [nik, noPolis, token, dispatch]);
 
   // Style registered klaim in the main layer
   useEffect(() => {
