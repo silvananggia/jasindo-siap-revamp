@@ -1,10 +1,13 @@
 import axios from "../api/axios";
 
-const getAnggota = (idkelompok, token) => {
+// Token is automatically added by axios interceptor from Redux store
+// Token parameter is kept for backward compatibility but is optional
+const getAnggota = (idkelompok, token = null) => {
   const config = {
     params: {}
   };
   
+  // Only override if token is explicitly provided
   if (token) {
     config.headers = {
       Authorization: `Bearer ${token}`
@@ -14,7 +17,7 @@ const getAnggota = (idkelompok, token) => {
   return axios.get(`/get-anggota/${idkelompok}`, config);
 };
 
-const getAnggotaKlaim = (nopolis, token) => {
+const getAnggotaKlaim = (nopolis, token = null) => {
   const config = {
     params: {
       nopolis
@@ -30,7 +33,7 @@ const getAnggotaKlaim = (nopolis, token) => {
   return axios.get(`/get-anggota-klaim`, config);
 };
 
-const detailAnggotaKlaim = (nik, nopolis, token) => {
+const detailAnggotaKlaim = (nik, nopolis, token = null) => {
   const config = {
     params: {
       nik,
@@ -47,7 +50,7 @@ const detailAnggotaKlaim = (nik, nopolis, token) => {
   return axios.get(`/detail-anggota-klaim`, config);
 };
 
-const getDetailPeserta = (idkelompok, nik, token) => {
+const getDetailPeserta = (idkelompok, nik, token = null) => {
   const config = {
     params: {
       idkelompok,

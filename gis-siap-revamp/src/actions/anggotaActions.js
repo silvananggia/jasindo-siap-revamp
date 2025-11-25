@@ -7,7 +7,9 @@ import {
 import AnggotaService from "../services/anggotaService";
 
 
-export const getAnggota = (idkelompok, token) => async (dispatch) => {
+// Token is automatically added by axios interceptor from Redux store
+// Token parameter is kept for backward compatibility but is optional
+export const getAnggota = (idkelompok, token = null) => async (dispatch) => {
     try {
         const res = await AnggotaService.getAnggota(idkelompok, token);
         //console.log("getAnggota - res:", res.data);
@@ -20,7 +22,7 @@ export const getAnggota = (idkelompok, token) => async (dispatch) => {
     }
 };
 
-export const getAnggotaKlaim = (nopolis, token) => async (dispatch) => {
+export const getAnggotaKlaim = (nopolis, token = null) => async (dispatch) => {
     try {
         const res = await AnggotaService.getAnggotaKlaim(nopolis, token);
         
@@ -34,7 +36,7 @@ export const getAnggotaKlaim = (nopolis, token) => async (dispatch) => {
     }
 };
 
-export const detailAnggotaKlaim = (nik, nopolis, token) => async (dispatch) => {
+export const detailAnggotaKlaim = (nik, nopolis, token = null) => async (dispatch) => {
     try {
         const res = await AnggotaService.detailAnggotaKlaim(nik, nopolis, token);
         return Promise.resolve(res.data);
@@ -44,7 +46,7 @@ export const detailAnggotaKlaim = (nik, nopolis, token) => async (dispatch) => {
     }
 };
 
-export const getDetailPeserta = (idkelompok, nik, token) => async (dispatch) => {
+export const getDetailPeserta = (idkelompok, nik, token = null) => async (dispatch) => {
     try {
         const res = await AnggotaService.getDetailPeserta(idkelompok, nik, token);
         return Promise.resolve(res.data);

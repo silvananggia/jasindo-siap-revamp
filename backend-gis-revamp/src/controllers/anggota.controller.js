@@ -1,9 +1,7 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 const qs = require("qs");
-
-// Get base URL from environment variable or use default
-const BASE_URL = process.env.BASE_URL || "http://localhost/newautp-siap-komersial";
+const { getBearerToken, GEOSPATIAL_BASE_URL, buildUnauthorizedResponse } = require("../utils/auth");
 
 // Function to normalize field names from HTML table headers
 const normalizeFieldName = (fieldName) => {
@@ -34,7 +32,6 @@ const normalizeFieldName = (fieldName) => {
 
 exports.getAnggota = async (req, res) => {
   const { id } = req.params;
-  const authHeader = req.headers.authorization;
 
   // Validate required parameter
   if (!id) {
@@ -43,13 +40,10 @@ exports.getAnggota = async (req, res) => {
     });
   }
 
-  // Validate authorization header
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: "Authorization Bearer token is required" });
-  }
+  const token = getBearerToken(req, res);
+  if (!token) return;
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const targetUrl = `http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v1/geospatial/getAnggotaKelompok`;
+  const targetUrl = `${GEOSPATIAL_BASE_URL}/getAnggotaKelompok`;
 
   try {
     const response = await axios.get(targetUrl, {
@@ -74,6 +68,9 @@ exports.getAnggota = async (req, res) => {
     
     // Return appropriate error status
     const statusCode = err.response?.status || 500;
+    if (statusCode === 401) {
+      return res.status(401).json(buildUnauthorizedResponse("Authentication required when accessing geospatial anggota kelompok data. Please refresh your session."));
+    }
     const errorMessage = err.response?.data || { message: 'Failed to fetch anggota kelompok', error: err.message };
     
     res.status(statusCode).json(errorMessage);
@@ -83,7 +80,6 @@ exports.getAnggota = async (req, res) => {
 
 exports.getAnggotaKlaim = async (req, res) => {
   const { nopolis } = req.query;
-  const authHeader = req.headers.authorization;
 
   // Validate required parameter
   if (!nopolis) {
@@ -92,13 +88,10 @@ exports.getAnggotaKlaim = async (req, res) => {
     });
   }
 
-  // Validate authorization header
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: "Authorization Bearer token is required" });
-  }
+  const token = getBearerToken(req, res);
+  if (!token) return;
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const targetUrl = `http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v1/geospatial/getAnggotaKlaim`;
+  const targetUrl = `${GEOSPATIAL_BASE_URL}/getAnggotaKlaim`;
 
   try {
     const response = await axios.get(targetUrl, {
@@ -123,6 +116,9 @@ exports.getAnggotaKlaim = async (req, res) => {
     
     // Return appropriate error status
     const statusCode = err.response?.status || 500;
+    if (statusCode === 401) {
+      return res.status(401).json(buildUnauthorizedResponse("Authentication required when accessing geospatial anggota klaim data. Please refresh your session."));
+    }
     const errorMessage = err.response?.data || { message: 'Failed to fetch anggota klaim', error: err.message };
     
     res.status(statusCode).json(errorMessage);
@@ -131,7 +127,6 @@ exports.getAnggotaKlaim = async (req, res) => {
 
 exports.detailAnggotaKlaim = async (req, res) => {
   const { nik, nopolis } = req.query;
-  const authHeader = req.headers.authorization;
 
   // Validate required parameters
   if (!nik || !nopolis) {
@@ -140,13 +135,10 @@ exports.detailAnggotaKlaim = async (req, res) => {
     });
   }
 
-  // Validate authorization header
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: "Authorization Bearer token is required" });
-  }
+  const token = getBearerToken(req, res);
+  if (!token) return;
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const targetUrl = `http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v1/geospatial/getPesertaKlaim`;
+  const targetUrl = `${GEOSPATIAL_BASE_URL}/getPesertaKlaim`;
 
   try {
     const response = await axios.get(targetUrl, {
@@ -173,6 +165,9 @@ exports.detailAnggotaKlaim = async (req, res) => {
     
     // Return appropriate error status
     const statusCode = err.response?.status || 500;
+    if (statusCode === 401) {
+      return res.status(401).json(buildUnauthorizedResponse("Authentication required when accessing detail anggota klaim. Please refresh your session."));
+    }
     const errorMessage = err.response?.data || { message: 'Failed to fetch detail anggota klaim', error: err.message };
     
     res.status(statusCode).json(errorMessage);
@@ -181,7 +176,6 @@ exports.detailAnggotaKlaim = async (req, res) => {
 
 exports.getDetailPeserta = async (req, res) => {
   const { idkelompok, nik } = req.query;
-  const authHeader = req.headers.authorization;
 
   // Validate required parameters
   if (!idkelompok || !nik) {
@@ -190,13 +184,10 @@ exports.getDetailPeserta = async (req, res) => {
     });
   }
 
-  // Validate authorization header
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: "Authorization Bearer token is required" });
-  }
+  const token = getBearerToken(req, res);
+  if (!token) return;
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const targetUrl = `http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v1/geospatial/getDetailPeserta`;
+  const targetUrl = `${GEOSPATIAL_BASE_URL}/getDetailPeserta`;
 
   try {
     const response = await axios.get(targetUrl, {
@@ -221,6 +212,9 @@ exports.getDetailPeserta = async (req, res) => {
     
     // Return appropriate error status
     const statusCode = err.response?.status || 500;
+    if (statusCode === 401) {
+      return res.status(401).json(buildUnauthorizedResponse("Authentication required when accessing detail peserta. Please refresh your session."));
+    }
     const errorMessage = err.response?.data || { message: 'Failed to fetch detail peserta', error: err.message };
     
     res.status(statusCode).json(errorMessage);

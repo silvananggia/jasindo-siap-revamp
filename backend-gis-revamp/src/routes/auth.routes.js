@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();  // Use the standard Express router
 const authController = require('../controllers/auth.controller');
-const extractCred = require('../middleware/credMiddleware');
 
 
-router.get('/checkAuth', extractCred, authController.checkAuth);
+router.get('/checkAuth', authController.checkAuth);
 
 module.exports = router;

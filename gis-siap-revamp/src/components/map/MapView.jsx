@@ -38,8 +38,10 @@ const MapRegister = () => {
   const idKelompokFromUrl = new URLSearchParams(location.search).get('idkelompok') || '';
 
   const [isDataLoaded, setIsDataLoaded] = useState(!!(nikFromUrl || idKelompokFromUrl));
-  const [token, setToken] = useState(null);
   const [isFetchingDetail, setIsFetchingDetail] = useState(false);
+  
+  // Get token from Redux store (set by useAuthListener)
+  const token = useSelector((state) => state.auth?.token);
   
   // Store form response data from API
   const [formResponse, setFormResponse] = useState({
@@ -58,18 +60,6 @@ const MapRegister = () => {
     idKlaim: ''
   });
 
-  // Listen for token from postMessage
-  useEffect(() => {
-    const handleMessage = (e) => {
-      if (e.data && e.data.token) {
-        setToken(e.data.token);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
   // Update formResponse when URL parameters change
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
@@ -86,16 +76,27 @@ const MapRegister = () => {
     }
   }, [location.search]);
 
-  // Fetch detail peserta when nik, idKelompok, and token are available
+  // Track if detail peserta has been fetched to prevent re-fetching
+  const detailPesertaFetchedRef = React.useRef(false);
+  
+  // Fetch detail peserta when nik, idKelompok, and token are available (only once)
   useEffect(() => {
     const fetchDetailPeserta = async () => {
-      const currentNik = formResponse.nik || nikFromUrl;
-      const currentIdKelompok = formResponse.idKelompok || idKelompokFromUrl;
+      const currentNik = nikFromUrl || formResponse.nik;
+      const currentIdKelompok = idKelompokFromUrl || formResponse.idKelompok;
       
+      // Prevent re-fetching if already fetched for this combination
+      const fetchKey = `${currentNik}-${currentIdKelompok}`;
+      if (detailPesertaFetchedRef.current === fetchKey) {
+        return;
+      }
+      
+      // Token is now automatically added by axios interceptor, but we still need to wait for it
       if (currentNik && currentIdKelompok && token && !isFetchingDetail) {
         setIsFetchingDetail(true);
         try {
-          const result = await dispatch(getDetailPeserta(currentIdKelompok, currentNik, token));
+          // Token is automatically added by axios interceptor, no need to pass it explicitly
+          const result = await dispatch(getDetailPeserta(currentIdKelompok, currentNik));
           
           // Handle nested response structure: result.data.data.status and result.data.data.data
           if (result && result.data && result.data.status === 200 && result.data.data) {
@@ -124,6 +125,8 @@ const MapRegister = () => {
             }
             
             setIsDataLoaded(true);
+            // Mark as fetched for this combination
+            detailPesertaFetchedRef.current = fetchKey;
           }
         } catch (error) {
           console.error('Error fetching detail peserta:', error);
@@ -134,7 +137,7 @@ const MapRegister = () => {
     };
 
     fetchDetailPeserta();
-  }, [formResponse.nik, formResponse.idKelompok, token, dispatch, nikFromUrl, idKelompokFromUrl, isFetchingDetail]);
+  }, [dispatch, nikFromUrl, idKelompokFromUrl, token]);
 
   // Initialize all form values as reactive variables using useMemo from formResponse
   const formDataValues = React.useMemo(() => {
@@ -373,18 +376,23 @@ const MapRegister = () => {
 
   useAuthListener();
 
+  // Track if petak has been fetched for current NIK to prevent re-fetching
+  const petakFetchedRef = React.useRef(null);
+  
   useEffect(() => {
    // console.log("MapView - Current formResponse:", formResponse);
    // console.log("MapView - isDataLoaded:", isDataLoaded);
 
-    
-    if (nik && nik.trim() !== '') {
+    // Wait for token to be available before making API calls
+    // Only fetch if NIK has changed or hasn't been fetched yet
+    if (nik && nik.trim() !== '' && token && petakFetchedRef.current !== nik) {
       //console.log("MapView - Fetching petak data for NIK:", nik);
       dispatch(getPetakUser(nik));
+      petakFetchedRef.current = nik; // Mark as fetched for this NIK
     } else {
-     // console.log("MapView - No NIK available, skipping petak data fetch");
+     // console.log("MapView - No NIK available or token not ready, skipping petak data fetch");
     }
-  }, [nik, dispatch, formResponse, isDataLoaded]);
+  }, [nik, dispatch, token]);
 
   if (loading) {
     return <Spinner className="content-loader" />;

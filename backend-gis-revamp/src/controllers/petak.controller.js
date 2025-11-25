@@ -3,8 +3,12 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { promisify } = require('util');
 const axios = require("axios");
+const { getBearerToken } = require("../utils/auth");
 
 exports.listAllPetak = async (req, res) => {
+    const token = getBearerToken(req, res);
+    if (!token) return;
+
     try {
 
           const result = await db.query(

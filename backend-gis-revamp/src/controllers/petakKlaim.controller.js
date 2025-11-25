@@ -4,8 +4,12 @@ const crypto = require("crypto");
 const { promisify } = require('util');
 const axios = require("axios");
 const { v4: uuidv4 } = require('uuid');
+const { getBearerToken } = require("../utils/auth");
 
 exports.savePetakKlaim = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   const percils = req.body; // Array of percils
 
   if (!Array.isArray(percils) || percils.length === 0) {
@@ -48,6 +52,9 @@ exports.savePetakKlaim = async (req, res) => {
 
 
 exports.listPetakKlaim = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
     const nopolis = req.params.nopolis;
@@ -79,6 +86,9 @@ exports.listPetakKlaim = async (req, res) => {
 };
 
 exports.deletePetakKlaim = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const klaimId = req.params.id;
     console.log('deletePetakKlaim called with klaimId:', klaimId);
@@ -126,6 +136,9 @@ exports.deletePetakKlaim = async (req, res) => {
 };
 
 exports.klaimId = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
 
@@ -155,6 +168,9 @@ exports.klaimId = async (req, res) => {
 };
 
 exports.getPetakKlaimID = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
 
@@ -214,6 +230,9 @@ exports.getPetakKlaimID = async (req, res) => {
 };
 
 exports.getPetakKlaimByNikGeoJSON = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const nik = req.query.nik;
     const nopolis = req.query.nopolis;

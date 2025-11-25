@@ -33,9 +33,12 @@ import DataPanel from './DataPanel';
 import LayerPanel from './LayerPanel';
 
 const MapRegister = () => {
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+
+  useAuthListener();
 
   const dispatch = useDispatch();
   const location = useLocation();
@@ -85,6 +88,7 @@ const MapRegister = () => {
 
   // Update formResponse when URL parameters change
   useEffect(() => {
+    
     const urlParams = new URLSearchParams(location.search);
     const nik = urlParams.get('nik') || '';
     const idKelompok = urlParams.get('idkelompok') || '';
@@ -516,7 +520,7 @@ const MapRegister = () => {
     }
   }, [selectedPercils, listPetak, jmlPetak, mapInstance]);
 
-  useAuthListener();
+  
 
   // Function to zoom to exact petak data by ID
   const zoomToPetakData = useCallback(async (petakList) => {

@@ -1,9 +1,10 @@
-import {CHECK_AUTH, AUTH_ERROR } from "../actions/types";
+import {CHECK_AUTH, AUTH_ERROR, SET_TOKEN } from "../actions/types";
 
 const initialState = {
   loading: true,
   isAuthenticated: false,
   user: null,
+  token: null,
   errmessage: "",
 };
 
@@ -17,7 +18,8 @@ function authReducer(state = initialState, action) {
         loading: false,
         errmessage: "",
         isAuthenticated: true,
-        user: payload
+        user: payload,
+        token: payload?.token || state.token
       };
       
     case AUTH_ERROR:
@@ -26,7 +28,14 @@ function authReducer(state = initialState, action) {
         loading: false,
         isAuthenticated: false,
         user: null,
+        token: null,
         errmessage: payload
+      };
+      
+    case SET_TOKEN:
+      return {
+        ...state,
+        token: payload
       };
       
     default:

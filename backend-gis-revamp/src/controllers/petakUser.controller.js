@@ -4,8 +4,12 @@ const crypto = require("crypto");
 const { promisify } = require('util');
 const axios = require("axios");
 const { v4: uuidv4 } = require('uuid');
+const { getBearerToken } = require("../utils/auth");
 
 exports.savePetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   const percils = req.body; // Array of percils
 
   if (!Array.isArray(percils) || percils.length === 0) {
@@ -64,6 +68,9 @@ exports.savePetakUser = async (req, res) => {
 };
 
 exports.listPetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
 
@@ -93,6 +100,9 @@ exports.listPetakUser = async (req, res) => {
 };
 
 exports.pointPetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
   
@@ -126,6 +136,9 @@ exports.pointPetakUser = async (req, res) => {
 };
 
 exports.listPointPetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
   
@@ -159,6 +172,9 @@ exports.listPointPetakUser = async (req, res) => {
 };
 
 exports.petakId = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const id = req.params.id;
 
@@ -188,6 +204,9 @@ exports.petakId = async (req, res) => {
 };
 
 exports.deletePetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const idpetak = req.params.id;
 
@@ -230,7 +249,57 @@ exports.deletePetakUser = async (req, res) => {
   }
 }
 
+exports.deletePetakUserByNik = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
+  try {
+    const nik = req.params.id;
+
+    // First check if any petak exists for this NIK
+    const checkResult = await db.query(
+      `SELECT id, nik, idpetak, luas FROM petak_user WHERE nik = $1`,
+      [nik]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: "error",
+        data: "No petak found for this NIK",
+      });
+    }
+
+    // Delete all petak for this NIK
+    const deleteResult = await db.query(
+      `DELETE FROM petak_user WHERE nik = $1 RETURNING id, nik, idpetak, luas`,
+      [nik]
+    );
+
+    res.json({
+      code: 200,
+      status: "success",
+      data: {
+        message: `${deleteResult.rows.length} petak deleted successfully`,
+        deletedCount: deleteResult.rows.length,
+        deletedPetaks: deleteResult.rows
+      },
+    });
+
+  } catch (error) {
+    console.error("Error deleting petak by NIK:", error);
+    res.status(500).json({
+      code: 500,
+      status: "error",
+      data: "Internal Server Error",
+    });
+  }
+}
+
 exports.centerPetakUser = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const nik = req.params.id;
 
@@ -286,6 +355,9 @@ exports.centerPetakUser = async (req, res) => {
 };
 
 exports.getPetakById = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const petakId = req.params.id;
 
@@ -347,6 +419,9 @@ exports.getPetakById = async (req, res) => {
 };
 
 exports.getPetakByIdPetak = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const idpetak = req.params.id;
 
@@ -408,6 +483,9 @@ exports.getPetakByIdPetak = async (req, res) => {
 };
 
 exports.getPetakUserByNikGeoJSON = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const nik = req.query.nik;
 
@@ -463,6 +541,9 @@ exports.getPetakUserByNikGeoJSON = async (req, res) => {
 };
 
 exports.checkPercilAvailability = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
   try {
     const { idpetak, musim_tanam, tgl_tanam } = req.query;
 
