@@ -2,6 +2,8 @@ const DEFAULT_GEOSPATIAL_BASE_URL = "http://service-dev-jasindo-revampsiap-be.ap
 
 const GEOSPATIAL_BASE_URL = process.env.GEOSPATIAL_BASE_URL || DEFAULT_GEOSPATIAL_BASE_URL;
 
+const BASE_URL_V2 = process.env.BASE_URL_V2;
+
 /**
  * Build a uniform unauthorized payload so consumers get a consistent message.
  */
@@ -32,6 +34,7 @@ const getBearerToken = (req, res) => {
 
 module.exports = {
   GEOSPATIAL_BASE_URL,
+  BASE_URL_V2,
   getBearerToken,
   buildUnauthorizedResponse
 };

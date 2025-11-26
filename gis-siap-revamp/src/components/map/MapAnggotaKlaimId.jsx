@@ -27,8 +27,9 @@ import { createBasemapLayer } from "../../utils/mapUtils";
 import { handleSearch } from "../../utils/mapUtils";
 import { getPercilStyle } from "../../utils/percilStyles";
 import { createPetak, getPetakID, getPetakUser, getCenterPetakUser } from "../../actions/petakActions";
-import { getAnggotaKlaim } from "../../actions/anggotaActions";
+import { getAnggotaKlaimId } from "../../actions/anggotaActions";
 import { getKlaimUser } from "../../actions/klaimActions";
+import { setToken as setTokenAction } from "../../actions/authActions";
 import BasemapSwitcher from "./BasemapSwitcher";
 import GeolocationControl from "./GeolocationControl";
 import Spinner from "../Spinner/Loading-spinner";
@@ -44,11 +45,11 @@ const MapAnggotaKlaim = () => {
   const dispatch = useDispatch();
   const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const { loading, errmessage } = useSelector((state) => state.auth);
+  const { loading, errmessage, token: storedToken } = useSelector((state) => state.auth);
   const { anggotalist, loading: anggotaLoading } = useSelector((state) => state.anggota);
   const { petaklist, loading: petakLoading } = useSelector((state) => state.petak);
 
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(storedToken || null);
   
   // Helper function to get current anggota from response
   const getCurrentAnggota = () => {
@@ -136,10 +137,10 @@ const MapAnggotaKlaim = () => {
   );
 
   // Helper function to get noPolis value with fallback
-  const getNoPolis = () => {
+  const getClaimid = () => {
     // First try URL params
     const urlParams = new URLSearchParams(location.search);
-    const noPolisFromUrl = urlParams.get('noPolis') || urlParams.get('nopolis') || '';
+    const claimidFromUrl = urlParams.get('claimid') || '';
     
     // Then try current anggota
     const currentAnggota = getCurrentAnggota();
@@ -148,13 +149,13 @@ const MapAnggotaKlaim = () => {
     // Then try from anggotalist
     const noPolisFromList = anggotalist?.noPolis || anggotalist?.nopolis || '';
     
-    return noPolisFromUrl || noPolisFromAnggota || noPolisFromList || '';
+    return claimidFromUrl || noPolisFromAnggota || noPolisFromList || '';
   };
 
   // Helper function to get URL-encoded noPolis value
   const getEncodedNoPolis = () => {
-    const noPolis = getNoPolis();
-    const encoded = encodeURIComponent(noPolis);
+    const claimid = getClaimid();
+    const encoded = encodeURIComponent(claimid);
     
     return encoded;
   };
@@ -182,9 +183,17 @@ const MapAnggotaKlaim = () => {
   }, [location.search]);
 
   useEffect(() => {
+    if (storedToken && storedToken !== token) {
+      setToken(storedToken);
+    }
+  }, [storedToken, token]);
+
+  useEffect(() => {
     const handleMessage = (e) => {
       if (e.data && e.data.token) {
-        setToken(e.data.token);
+        const tokenValue = e.data.token;
+        setToken(tokenValue);
+        dispatch(setTokenAction(tokenValue));
       }
       if (e.data && e.data.address) {
         setSearchInput(e.data.address);
@@ -202,7 +211,7 @@ const MapAnggotaKlaim = () => {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [mapInstance]);
+  }, [mapInstance, dispatch]);
 
   useEffect(() => {
     setTotalArea(
@@ -301,26 +310,28 @@ const MapAnggotaKlaim = () => {
   };
 
 
-  useEffect( () => {
+  useEffect(() => {
     // Get noPolis from multiple sources
     const urlParams = new URLSearchParams(location.search);
-    const noPolisFromUrl = urlParams.get('noPolis') || urlParams.get('nopolis') || '';
+    const claimidFromUrl = urlParams.get('claimid') || '';
     
     const currentAnggota = getCurrentAnggota();
     const noPolisFromAnggota = currentAnggota?.noPolis || currentAnggota?.nopolis || '';
     
     const noPolisFromList = anggotalist?.noPolis || anggotalist?.nopolis || '';
     
-    const nopolis = noPolisFromUrl || noPolisFromAnggota || noPolisFromList || '';
+    const nopolis = claimidFromUrl || noPolisFromAnggota || noPolisFromList || '';
 
     
-    if (nopolis && token) {
+    const claimIdValue = getClaimid();
+    
+    if (claimIdValue && token) {
       //console.log('Dispatching getAnggotaKlaim:', { nopolis, token });
-      dispatch(getAnggotaKlaim(nopolis, token));
+      dispatch(getAnggotaKlaimId(claimIdValue, token));
     } else {
      // console.log('Not dispatching getAnggotaKlaim - missing:', { nopolis: !nopolis, token: !token });
     }
-  },[location.search, currentAnggotaIndex, token]);
+  }, [location.search, currentAnggotaIndex, token, dispatch]);
 
   // Update search input from response
   useEffect(() => {

@@ -12,7 +12,9 @@ const MapAnggota = lazy(() => import('../components/map/MapAnggota'));
 const MapAnggotaDisetujui = lazy(() => import('../components/map/MapAnggotaDisetujui'));
 const MapAnggotaKlaim = lazy(() => import('../components/map/MapAnggotaKlaim'));
 const MapViewClaim = lazy(() => import('../components/map/MapViewClaim'));
-
+const MapKlaimId = lazy(() => import('../components/map/MapClaimId'));
+const MapAnggotaKlaimId = lazy(() => import('../components/map/MapAnggotaKlaimId'));
+const MapViewKlaimId = lazy(() => import('../components/map/MapViewClaimId'));
 
 function MyRouter() {
     return (
@@ -60,6 +62,21 @@ function MyRouter() {
             <Route path='/map-view-klaim' element={
                 <Suspense fallback={<Spinner className="content-loader" />}>
                     <MapViewClaim />
+                </Suspense>
+            } />
+            <Route path='/map-klaim-id' element={
+                <Suspense fallback={<Spinner className="content-loader" />}>
+                    <MapKlaimId />
+                </Suspense>
+            } />
+            <Route path='/map-anggota-klaim-id' element={
+                <Suspense fallback={<Spinner className="content-loader" />}>
+                    <MapAnggotaKlaimId />
+                </Suspense>
+            } />
+            <Route path='/map-view-klaim-id' element={
+                <Suspense fallback={<Spinner className="content-loader" />}>
+                    <MapViewKlaimId />
                 </Suspense>
             } />
         </Routes>

@@ -67,11 +67,47 @@ const getDetailPeserta = (idkelompok, nik, token = null) => {
   return axios.get(`/get-detail-peserta`, config);
 };
 
+
+
+const getAnggotaKlaimId = (claimid, token = null) => {
+  const config = {
+    params: {
+      claimid
+    }
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/v2/get-anggota-klaim`, config);
+};
+
+const detailAnggotaKlaimId = (nik, claimid, token = null) => {
+  const config = {
+    params: {
+      nik,
+      claimid
+    }
+  };
+  
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`
+    };
+  }
+  
+  return axios.get(`/v2/detail-anggota-klaim`, config);
+};
 const anggotaService = {
   getAnggota,
   getAnggotaKlaim,
   detailAnggotaKlaim,
-  getDetailPeserta
+  getDetailPeserta,
+  getAnggotaKlaimId,
+  detailAnggotaKlaimId  
 };
 
 export default anggotaService;
