@@ -2,7 +2,14 @@ const DEFAULT_GEOSPATIAL_BASE_URL = "http://service-dev-jasindo-revampsiap-be.ap
 
 const GEOSPATIAL_BASE_URL = process.env.GEOSPATIAL_BASE_URL || DEFAULT_GEOSPATIAL_BASE_URL;
 
-const BASE_URL_V2 = process.env.BASE_URL_V2 || 'http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v2/geospatial';
+const FALLBACK_BASE_URL_V2 = 'http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v2/geospatial';
+
+/**
+ * Some deployments accidentally set BASE_URL_V2 to an empty string or a value
+ * with whitespace. Trim it so we only honor a truly usable absolute URL.
+ */
+const resolvedBaseUrlV2 = (process.env.BASE_URL_V2 || "").trim();
+const BASE_URL_V2 = resolvedBaseUrlV2 || FALLBACK_BASE_URL_V2;
 
 /**
  * Build a uniform unauthorized payload so consumers get a consistent message.
