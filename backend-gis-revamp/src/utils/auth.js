@@ -2,7 +2,7 @@ const DEFAULT_GEOSPATIAL_BASE_URL = "http://service-dev-jasindo-revampsiap-be.ap
 
 const GEOSPATIAL_BASE_URL = process.env.GEOSPATIAL_BASE_URL || DEFAULT_GEOSPATIAL_BASE_URL;
 
-const BASE_URL_V2 = process.env.BASE_URL_V2;
+const BASE_URL_V2 = process.env.BASE_URL_V2 || 'http://service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id/siap-geospatial-service/api/v2/geospatial';
 
 /**
  * Build a uniform unauthorized payload so consumers get a consistent message.
