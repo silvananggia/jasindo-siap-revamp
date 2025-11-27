@@ -496,6 +496,7 @@ exports.getPetakUserByNikGeoJSON = async (req, res) => {
         id,
         nik,
         luas,
+        idpetak,
         ST_AsGeoJSON(ST_Transform(geometry, 4326))::json AS geometry
       FROM petak_user
       WHERE nik = $1
@@ -518,6 +519,7 @@ exports.getPetakUserByNikGeoJSON = async (req, res) => {
       properties: {
         id: row.id,
         nik: row.nik,
+        idpetak: row.idpetak,
         luas: parseFloat(row.luas)
       },
       geometry: row.geometry

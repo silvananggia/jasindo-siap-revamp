@@ -249,14 +249,15 @@ exports.getPetakKlaimByNikGeoJSON = async (req, res) => {
     const result = await db.query(
       `
       SELECT 
-        id,
-        nik,
-        nopolis,
-        luas,
-        ST_AsGeoJSON(ST_Transform(geometry, 4326))::json AS geometry
-      FROM petak_klaim
-      WHERE nik = $1 and nopolis = $2
-      ORDER BY idpetak
+        petak_klaim.id as id,
+        petak_klaim.nik as nik,
+        petak_user.idpetak as idpetak,
+        petak_klaim.nopolis as nopolis,
+        petak_klaim.luas as luas,
+        ST_AsGeoJSON(ST_Transform(petak_klaim.geometry, 4326))::json AS geometry
+      FROM petak_klaim JOIN petak_user ON petak_klaim.idpetak = petak_user.id
+      WHERE petak_klaim.nik = $1 and petak_klaim.nopolis = $2
+      ORDER BY petak_user.idpetak
       `,
       [nik, nopolis]
     );
@@ -274,8 +275,78 @@ exports.getPetakKlaimByNikGeoJSON = async (req, res) => {
       type: "Feature",
       properties: {
         id: row.id,
-        nopolis: row.nopolis,
         nik: row.nik,
+        nopolis: row.nopolis,
+        idpetak: row.idpetak,
+        luas: parseFloat(row.luas)
+      },
+      geometry: row.geometry
+    }));
+
+    const geoJSON = {
+      type: "FeatureCollection",
+      features: features
+    };
+    
+    res.json(geoJSON);
+
+  } catch (error) {
+    console.error("Error getting petak klaim GeoJSON by NIK:", error);
+    res.status(500).json({
+      code: 500,
+      status: "error",
+      data: "Internal Server Error",
+    });
+  }
+};
+
+exports.getPetakKlaimByClaimIdGeoJSON = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
+  try {
+    const claimid = req.query.claimid;
+
+    if (!claimid) {
+      return res.status(400).json({
+        code: 400,
+        status: "error",
+        data: "claimid query parameter is required",
+      });
+    }
+
+    // Get all petak klaim geometries for the user by NIK and return as GeoJSON FeatureCollection
+    const result = await db.query(
+      `
+      SELECT 
+        petak_klaim.id as id,
+        petak_klaim.nik as nik,
+        petak_user.idpetak as idpetak,
+        petak_klaim.nopolis as nopolis,
+        petak_klaim.luas as luas,
+        ST_AsGeoJSON(ST_Transform(petak_klaim.geometry, 4326))::json AS geometry
+      FROM petak_klaim JOIN petak_user ON petak_klaim.idpetak = petak_user.id
+      WHERE petak_klaim.nopolis = $1
+      ORDER BY petak_user.idpetak
+      `,
+      [claimid]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        status: "error",
+        data: "No petak klaim data found for this NIK",
+      });
+    }
+
+    // Create GeoJSON FeatureCollection
+    const features = result.rows.map(row => ({
+      type: "Feature",
+      properties: {
+        id: row.id,
+        nik: row.nik,
+        idpetak: row.idpetak,
         luas: parseFloat(row.luas)
       },
       geometry: row.geometry
