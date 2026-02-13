@@ -37,6 +37,7 @@ const petakUserRoute = require("./routes/petakUser.routes");
 const petakKlaimRoute = require("./routes/petakKlaim.routes");
 const anggotaRoute = require("./routes/anggota.routes");
 const anggotav2Route = require("./routes/anggotav2.routes");
+const petakAnalisisRoute = require("./routes/petakAnalisis.routes");
 
 
 app.use(express.urlencoded({ extended: true }));
@@ -52,5 +53,5 @@ app.use("/api/", petakUserRoute);
 app.use("/api/", petakKlaimRoute);
 app.use("/api/", anggotaRoute);
 app.use("/api/v2/", anggotav2Route);
-
+app.use("/api/", petakAnalisisRoute);
 module.exports = app;

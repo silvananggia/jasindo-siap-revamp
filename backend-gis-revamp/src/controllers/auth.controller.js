@@ -1,4 +1,4 @@
-const db = require("../config/database");
+const db = require("../config/db1");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { promisify } = require('util');

@@ -1,4 +1,4 @@
-const db = require("../config/database");
+const db = require("../config/db1");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { promisify } = require('util');
@@ -285,6 +285,7 @@ exports.getPetakKlaimByNikGeoJSON = async (req, res) => {
 
     const geoJSON = {
       type: "FeatureCollection",
+      total_luas: result.rows.reduce((acc, row) => acc + parseFloat(row.luas), 0),
       features: features
     };
     
@@ -354,6 +355,7 @@ exports.getPetakKlaimByClaimIdGeoJSON = async (req, res) => {
 
     const geoJSON = {
       type: "FeatureCollection",
+      total_luas: result.rows.reduce((acc, row) => acc + parseFloat(row.luas), 0),
       features: features
     };
     
