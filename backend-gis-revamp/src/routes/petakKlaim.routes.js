@@ -9,6 +9,7 @@ router.get('/klaimid/:id', petakKlaimController.klaimId)
 router.get('/petak-klaim-id/:id', petakKlaimController.getPetakKlaimID)
 router.get('/petak-klaim-geojson', petakKlaimController.getPetakKlaimByNikGeoJSON)
 router.get('/petak-klaim-id-geojson', petakKlaimController.getPetakKlaimByClaimIdGeoJSON)
+router.get('/petak-klaim-nik-id-geojson', petakKlaimController.getPetakKlaimByNikIdGeoJSON)
 router.delete('/petak-klaim/:id', petakKlaimController.deletePetakKlaim)
 
 module.exports = router;
