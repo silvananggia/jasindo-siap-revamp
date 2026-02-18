@@ -64,7 +64,7 @@ exports.listPetakKlaim = async (req, res) => {
   SELECT petak_klaim.id AS id, petak_klaim.luas, petak_user.id as idpuser, petak_user.idpetak AS idpetak 
     FROM petak_klaim
     JOIN petak_user ON petak_klaim.idpetak = petak_user.id
-    WHERE petak_klaim.nik=$1 and petak_klaim.nopolis=$2
+    WHERE petak_klaim.nik=$1 and petak_klaim.claimid=$2
     `,
       [id, nopolis]
     );
