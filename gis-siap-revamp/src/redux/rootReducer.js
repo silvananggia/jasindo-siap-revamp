@@ -3,6 +3,7 @@ import authReducer from './authReducer';
 import petakReducer from './petakReducer';
 import klaimReducer from './klaimReducer';
 import anggotaReducer from './anggotaReducer';
+import analisisReducer from './analisisReducer';
 
 const rootReducer = combineReducers({
   
@@ -10,6 +11,7 @@ const rootReducer = combineReducers({
   petak : petakReducer,
   klaim : klaimReducer,
   anggota : anggotaReducer,
+  analisis : analisisReducer,
 });
 
 export default rootReducer;

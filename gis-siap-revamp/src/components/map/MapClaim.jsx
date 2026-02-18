@@ -41,7 +41,7 @@ const MapRegister = () => {
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
   const [nik, setNik] = useState('');
   const [noPolis, setNoPolis] = useState('');
-  
+  const [claimid, setClaimid] = useState('');
   // Helper function to get data from detailAnggotaKlaim response
   const getDetailData = () => {
     if (!detailAnggotaData) return null;
@@ -176,7 +176,7 @@ const MapRegister = () => {
       if (e.data && e.data.nik) {
         if (e.data.nik) setNik(e.data.nik);
         if (e.data.noPolis) setNoPolis(e.data.noPolis);
-        
+        if (e.data.claimid) setClaimid(e.data.claimid);
         if (e.data.address) {
           setSearchInput(e.data.address);
           setTimeout(() => {
@@ -343,17 +343,18 @@ const MapRegister = () => {
 
   const handleSimpan = async () => {
     const detailData = getDetailData();
-    if (!nik || !noPolis) {
+    if (!nik || !claimid || !noPolis) {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Data nik atau noPolis tidak tersedia.",
+        text: "Data nik, claimid atau noPolis tidak tersedia.",
       });
       return;
     }
 
     const payload = selectedPercils.map(p => ({
       nik,
+      claimid: claimid,
       nopolis: noPolis,
       idpetak: p.id,
       luas: p.area,
@@ -368,7 +369,7 @@ const MapRegister = () => {
       setSelectedPercils([]);
       
       // Refresh the klaim list to show newly saved klaim in "Lahan Terdaftar"
-      await dispatch(getKlaimUser(nik, noPolis));
+      await dispatch(getKlaimUser(nik, claimid, noPolis));
       
       Swal.fire({
         icon: "success",

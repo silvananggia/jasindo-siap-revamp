@@ -4,7 +4,7 @@ import "./MapAnalytic.css";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Autocomplete } from "@react-google-maps/api";
-import { Box, Tabs, Tab, IconButton, Snackbar, Alert, Accordion, AccordionSummary, AccordionDetails, List, ListItem, ListItemText, ListItemAvatar, Avatar, Typography, Divider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Card, CardContent, Grid } from "@mui/material";
+import { Box, Tabs, Tab, IconButton, Snackbar, Alert, Accordion, AccordionSummary, AccordionDetails, List, ListItem, ListItemText, ListItemAvatar, Avatar, Typography, Divider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Card, CardContent, Grid, Checkbox, FormControlLabel } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ListIcon from "@mui/icons-material/List";
 import LayersIcon from "@mui/icons-material/Layers";
@@ -30,6 +30,7 @@ import { createPetak, getPetakID, getPetakUser, getCenterPetakUser } from "../..
 import { getAnggotaKlaimId } from "../../actions/anggotaActions";
 import { getKlaimUser } from "../../actions/klaimActions";
 import { setToken as setTokenAction } from "../../actions/authActions";
+import { getTanamPetak, getNDPIAnalisis, getWaterAnalisis, getBareAnalisis } from "../../actions/analisisActions";
 import BasemapSwitcher from "./BasemapSwitcher";
 import GeolocationControl from "./GeolocationControl";
 import Spinner from "../Spinner/Loading-spinner";
@@ -90,6 +91,30 @@ const MapAnggotaKlaim = () => {
   // Panel state - simplified with react-rnd
   const [isPanelMaximized, setIsPanelMaximized] = useState(false);
   const [isChartMaximized, setIsChartMaximized] = useState(false);
+  const [selectedPetakId, setSelectedPetakId] = useState(null);
+  const [tanamCountLast2Years, setTanamCountLast2Years] = useState(null);
+
+  // Chart series visibility
+  const [showWater, setShowWater] = useState(true);
+  const [showBare, setShowBare] = useState(true);
+  const [showNdpi, setShowNdpi] = useState(true);
+
+  // Helper: safely normalize API series data to an array
+  const toArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    // Try parse JSON string
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch (e) {
+        return [value];
+      }
+    }
+    // For objects or primitives, wrap in array
+    return [value];
+  };
 
   const handlePercilSelect = useCallback(
     async (percilData) => {
@@ -125,6 +150,55 @@ const MapAnggotaKlaim = () => {
             return updated;
           }
         });
+
+        // Load analytic chart data for the clicked petak
+        try {
+          const petakId = percilData.petakid;
+          setSelectedPetakId(petakId);
+
+          const [tanamRes, ndpiRes, waterRes, bareRes] = await Promise.all([
+            dispatch(getTanamPetak(petakId)),
+            dispatch(getNDPIAnalisis(petakId)),
+            dispatch(getWaterAnalisis(petakId)),
+            dispatch(getBareAnalisis(petakId)),
+          ]);
+
+          const tanamCount = tanamRes?.data?.tanam_last2th ?? null;
+          const ndpiData = toArray(ndpiRes?.data?.ndpi_val_last2th);
+          const waterData = toArray(waterRes?.data?.water_val_last2th);
+          const bareData = toArray(bareRes?.data?.bare_val_last2th);
+          const satEpoch = toArray(ndpiRes?.data?.sat_epoch ?? null);
+
+          const maxLen = Math.max(
+            ndpiData.length || 0,
+            waterData.length || 0,
+            bareData.length || 0
+          );
+
+
+          setChartData({
+            dates: satEpoch,
+            // Banjir chart uses Water index
+            floodData: waterData,
+            // Kekeringan chart uses Bare index
+            droughtData: bareData,
+            // Vegetasi chart uses NDPI index
+            rainfallData: ndpiData,
+          });
+
+          // Save tanam count (2 years) for ringkasan lahan
+          setTanamCountLast2Years(tanamCount);
+
+          // Open analytics panel when petak is clicked so charts are visible
+          setAnalyticsPanelOpen(true);
+        } catch (apiError) {
+          console.error("Error loading petak analytics:", apiError);
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Gagal memuat data analisis petak.",
+          });
+        }
       } catch (err) {
         Swal.fire({
           icon: "error",
@@ -787,7 +861,7 @@ const MapAnggotaKlaim = () => {
     return dates;
   };
 
-  // Generate sample data for the charts (you can replace this with real API data)
+  // Generate sample data for the charts (used as initial placeholder before API data loads)
   const generateChartData = () => {
     const dates = generateLastTwoMonthsData();
     const floodData = dates.map(() => Math.random() * 10 + 1); // Random flood data
@@ -805,7 +879,7 @@ const MapAnggotaKlaim = () => {
     };
   };
 
-  const chartData = useMemo(() => generateChartData(), []);
+  const [chartData, setChartData] = useState(() => generateChartData());
   const dates = chartData.dates || [];
 
   if (loading) {
@@ -1413,20 +1487,70 @@ const MapAnggotaKlaim = () => {
                 <Typography variant="caption" color="text.secondary" sx={{ marginBottom: '6px', fontSize: '0.7rem' }}>
                   NIK: {selectedAnggota.nik || 'Tidak tersedia'}
                 </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ marginBottom: '6px', fontSize: '0.7rem' }}>
+                  ID Petak Terpilih: {selectedPetakId || '-'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  Riwayat Tanam 2 Tahun Terakhir:{' '}
+                  {tanamCountLast2Years != null
+                    ? `${tanamCountLast2Years} kali`
+                    : 'Tidak ada data'}
+                </Typography>
               </AccordionDetails>
             </Accordion>
 
             <Accordion sx={{ width: '100%' }}>
               <AccordionSummary
                 expandIcon={<ExpandMoreIcon sx={{ fontSize: '18px' }} />}
-                aria-controls="productivity-content"
-                id="productivity-header"
+                aria-controls="overview-content"
+                id="overview-header"
                 sx={{ width: '100%', minHeight: '40px' }}
               >
-                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Banjir</Typography>
+                <Typography sx={{ fontSize: '0.85rem' }}>
+                  Analisis Petak (Water / Bare / NDPI)
+                </Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ width: '100%', padding: '12px' }}>
-                <Box className="chart-container">
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={showBare}
+                        onChange={(e) => setShowBare(e.target.checked)}
+                      />
+                    }
+                    label={<Typography sx={{ fontSize: '0.7rem' }}>Kekeringan (Bare)</Typography>}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={showNdpi}
+                        onChange={(e) => setShowNdpi(e.target.checked)}
+                      />
+                    }
+                    label={<Typography sx={{ fontSize: '0.7rem' }}>Vegetasi (NDPI)</Typography>}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={showWater}
+                        onChange={(e) => setShowWater(e.target.checked)}
+                      />
+                    }
+                    label={<Typography sx={{ fontSize: '0.7rem' }}>Banjir (Water)</Typography>}
+                  />
+                </Box>
+                <Box
+                  className="chart-container"
+                  sx={{
+                    position: 'relative',
+                    width: '100%',
+                    height: isChartMaximized ? 320 : 220,
+                  }}
+                >
                   <IconButton
                     size="small"
                     onClick={handleMaximizeChart}
@@ -1449,116 +1573,42 @@ const MapAnggotaKlaim = () => {
                       scaleType: 'band'
                     }]}
                     series={[
-                      {
-                        data: chartData.floodData,
-                        label: "Banjir",
-                        color: "#4e79a7",
-                      },
+                      ...(showBare
+                        ? [
+                            {
+                              data: chartData.droughtData,
+                              label: "Kekeringan (Bare)",
+                              color: "#e15759",
+                              showMark: false,
+                              curve: "linear",
+                            },
+                          ]
+                        : []),
+                      ...(showNdpi
+                        ? [
+                            {
+                              data: chartData.rainfallData,
+                              label: "Vegetasi (NDPI)",
+                              color: "#59a14f",
+                              showMark: false,
+                              curve: "linear",
+                            },
+                          ]
+                        : []),
+                      ...(showWater
+                        ? [
+                            {
+                              data: chartData.floodData,
+                              label: "Banjir (Water)",
+                              color: "#4e79a7",
+                              showMark: false,
+                              curve: "linear",
+                            },
+                          ]
+                        : []),
                     ]}
-                    height={isChartMaximized ? 400 : 200}
-                    width={250}
-                    sx={{
-                      '.MuiChartsAxis-tickLabel': {
-                        fontSize: '0.65rem',
-                      }
-                    }}
-                  />
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-
-            <Accordion sx={{ width: '100%' }}>
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ fontSize: '18px' }} />}
-                aria-controls="drought-content"
-                id="drought-header"
-                sx={{ width: '100%', minHeight: '40px' }}
-              >
-                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Kekeringan</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ width: '100%', padding: '12px' }}>
-                <Box className="chart-container">
-                  <IconButton
-                    size="small"
-                    onClick={handleMaximizeChart}
-                    sx={{ 
-                      position: 'absolute', 
-                      top: 3, 
-                      right: 3, 
-                      zIndex: 1,
-                      backgroundColor: 'rgba(255,255,255,0.8)',
-                      padding: '2px',
-                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
-                    }}
-                    title={isChartMaximized ? "Restore Chart" : "Maximize Chart"}
-                  >
-                    {isChartMaximized ? "⛶" : "⛶"}
-                  </IconButton>
-                  <LineChart
-                    xAxis={[{ 
-                      data: chartData.dates,
-                        scaleType: 'band'
-                    }]}
-                    series={[
-                      {
-                        data: chartData.droughtData,
-                        label: "Kekeringan",
-                        color: "#e15759",
-                      },
-                    ]}
-                    height={isChartMaximized ? 400 : 200}
-                    width={250}
-                    sx={{
-                      '.MuiChartsAxis-tickLabel': {
-                        fontSize: '0.65rem',
-                      }
-                    }}
-                  />
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-
-            <Accordion sx={{ width: '100%' }}>
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ fontSize: '18px' }} />}
-                aria-controls="rainfall-content"
-                id="rainfall-header"
-                sx={{ width: '100%', minHeight: '40px' }}
-              >
-                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Curah Hujan</Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ width: '100%', padding: '12px' }}>
-                <Box className="chart-container">
-                  <IconButton
-                    size="small"
-                    onClick={handleMaximizeChart}
-                    sx={{ 
-                      position: 'absolute', 
-                      top: 3, 
-                      right: 3, 
-                      zIndex: 1,
-                      backgroundColor: 'rgba(255,255,255,0.8)',
-                      padding: '2px',
-                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
-                    }}
-                    title={isChartMaximized ? "Restore Chart" : "Maximize Chart"}
-                  >
-                    {isChartMaximized ? "⛶" : "⛶"}
-                  </IconButton>
-                  <LineChart
-                    xAxis={[{ 
-                      data: chartData.dates,
-                      scaleType: 'band'
-                    }]}
-                    series={[
-                      {
-                        data: chartData.rainfallData,
-                        label: "Curah Hujan (mm)",
-                        color: "#59a14f",
-                      },
-                    ]}
-                    height={isChartMaximized ? 400 : 200}
-                    width={250}
+                    height={isChartMaximized ? 300 : 200}
+                    width={320}
                     sx={{
                       '.MuiChartsAxis-tickLabel': {
                         fontSize: '0.65rem',

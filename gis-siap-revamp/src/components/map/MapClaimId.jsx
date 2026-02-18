@@ -156,12 +156,16 @@ const MapRegister = () => {
     const urlParams = new URLSearchParams(location.search);
     const nikFromUrl = urlParams.get('nik') || '';
     const claimidFromUrl = urlParams.get('claimid') || urlParams.get('claimId') || '';
+    const noPolisFromUrl = urlParams.get('noPolis') || '';
     
     if (nikFromUrl) {
       setNik(nikFromUrl);
     }
     if (claimidFromUrl) {
       setClaimid(claimidFromUrl);
+    }
+    if (noPolisFromUrl) {
+      setNoPolis(noPolisFromUrl);
     }
   }, [location.search]);
 
@@ -182,7 +186,7 @@ const MapRegister = () => {
       if (e.data && e.data.nik) {
         if (e.data.nik) setNik(e.data.nik);
         if (e.data.noPolis) setNoPolis(e.data.noPolis);
-        
+        if (e.data.claimid) setClaimid(e.data.claimid);
         if (e.data.address) {
           setSearchInput(e.data.address);
           setTimeout(() => {
@@ -349,7 +353,7 @@ const MapRegister = () => {
 
   const handleSimpan = async () => {
     const detailData = getDetailData();
-    if (!nik || !claimid) {
+    if (!nik || !claimid || !noPolis) {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -360,7 +364,8 @@ const MapRegister = () => {
 
     const payload = selectedPercils.map(p => ({
       nik,
-      nopolis: claimid,
+      claimid: claimid,
+      nopolis: noPolis,
       idpetak: p.id,
       luas: p.area,
       geometry: p.geometry,
@@ -485,7 +490,8 @@ const MapRegister = () => {
               idkec: detailData.idkec || '',
               jmlPetak: detailData.jmlPetak || 0,
               luasLahan: detailData.luasLahan || 0,
-              noPolis: claimid || '',
+              noPolis: noPolis || '',
+              claimid: claimid || '',
               idKelompok: '',
               idKlaim: '',
               tglKejadian: detailData.tgl_kejadian || detailData.tglKejadian || '',
@@ -500,7 +506,8 @@ const MapRegister = () => {
               idkec: '',
               jmlPetak: 0,
               luasLahan: 0,
-              noPolis: claimid || '',
+              noPolis: noPolis || '',
+              claimid: claimid || '',
               idKelompok: '',
               idKlaim: '',
               tglKejadian: '',
