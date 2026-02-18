@@ -154,7 +154,7 @@ const MapViewClaim = () => {
       if (e.data && e.data.nik) {
         if (e.data.nik) setNik(e.data.nik);
         if (e.data.noPolis) setNoPolis(e.data.noPolis);
-        
+        if (e.data.claimid) setClaimid(e.data.claimid);
         if (e.data.address) {
           setSearchInput(e.data.address);
           setTimeout(() => {
@@ -194,6 +194,41 @@ const MapViewClaim = () => {
           setDetailAnggotaData(response);
           // Response structure: { success: true, nik, nopolis, data: { status: 200, message: "Success", data: {...}, timestamp: "..." } }
           const data = response.data?.data || null;
+          
+          // Extract noPolis from multiple possible locations in response
+          let foundNoPolis = null;
+          
+          // Check top level response
+          if (response.nopolis || response.noPolis || response.no_polis) {
+            foundNoPolis = response.nopolis || response.noPolis || response.no_polis;
+          }
+          // Check nested data object
+          else if (data) {
+            // Check all possible field name variations
+            foundNoPolis = data.noPolis || data.nopolis || data.no_polis || 
+                          data.nomorPolis || data.nomor_polis || data.NomorPolis ||
+                          data.polis || data.polish || null;
+          }
+          
+          // Also check response.data directly (in case structure is different)
+          if (!foundNoPolis && response.data) {
+            const directData = response.data;
+            foundNoPolis = directData.noPolis || directData.nopolis || directData.no_polis ||
+                          directData.nomorPolis || directData.nomor_polis || null;
+          }
+          
+          if (foundNoPolis) {
+            setNoPolis(foundNoPolis);
+          } else {
+            // Log for debugging
+            console.warn('NoPolis not found in response:', {
+              hasResponse: !!response,
+              hasData: !!data,
+              responseKeys: response ? Object.keys(response) : [],
+              dataKeys: data ? Object.keys(data) : []
+            });
+          }
+          
           if (data) {
             if (!nik && data.nik) {
               setNik(data.nik);
@@ -201,8 +236,8 @@ const MapViewClaim = () => {
             if (data.address) {
               setSearchInput(data.address);
             }
-            if (data.noPolis || data.nopolis) {
-              setNoPolis(data.noPolis || data.nopolis || '');
+            if (data.claimid) {
+              setClaimid(data.claimid);
             }
           }
         }
@@ -377,7 +412,8 @@ const MapViewClaim = () => {
               idkec: detailData.idkec || '',
               jmlPetak: detailData.jmlPetak || 0,
               luasLahan: detailData.luasLahan || 0,
-              noPolis: claimid || '',
+              noPolis: noPolis || '',
+              claimid: claimid || '',
               idKelompok: '',
               idKlaim: '',
               tglKejadian: detailData.tgl_kejadian || detailData.tglKejadian || '',
@@ -392,7 +428,8 @@ const MapViewClaim = () => {
               idkec: '',
               jmlPetak: 0,
               luasLahan: 0,
-              noPolis: claimid || '',
+              noPolis: noPolis || '',
+              claimid: claimid || '',
               idKelompok: '',
               idKlaim: '',
               tglKejadian: '',

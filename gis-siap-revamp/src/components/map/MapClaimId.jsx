@@ -156,7 +156,7 @@ const MapRegister = () => {
     const urlParams = new URLSearchParams(location.search);
     const nikFromUrl = urlParams.get('nik') || '';
     const claimidFromUrl = urlParams.get('claimid') || urlParams.get('claimId') || '';
-    const noPolisFromUrl = urlParams.get('noPolis') || '';
+    const noPolisFromUrl = urlParams.get('noPolis') || urlParams.get('nopolis') || '';
     
     if (nikFromUrl) {
       setNik(nikFromUrl);
@@ -277,10 +277,10 @@ const MapRegister = () => {
 
   // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && claimid && token) {
-      dispatch(getKlaimUser(nik, claimid));
+    if (nik && noPolis && token) {
+      dispatch(getKlaimUser(nik, noPolis));
     }
-  }, [nik, claimid, token, dispatch]);
+  }, [nik, noPolis, token, dispatch]);
 
   // Style registered klaim in the main layer
   useEffect(() => {
@@ -379,7 +379,7 @@ const MapRegister = () => {
       setSelectedPercils([]);
       
       // Refresh the klaim list to show newly saved klaim in "Lahan Terdaftar"
-      await dispatch(getKlaimUser(nik, claimid));
+      await dispatch(getKlaimUser(nik, noPolis));
       
       Swal.fire({
         icon: "success",
@@ -402,8 +402,8 @@ const MapRegister = () => {
       await dispatch(deleteKlaim(klaimId));
       // console.log('MapClaim.handleDeleteKlaim: deleteKlaim completed');
       // Refresh the klaim list after deletion
-      if (nik && claimid) {
-        await dispatch(getKlaimUser(nik, claimid));
+      if (nik && noPolis) {
+        await dispatch(getKlaimUser(nik, noPolis));
       }
       // console.log('MapClaim.handleDeleteKlaim: getKlaimUser completed');
     } catch (error) {
