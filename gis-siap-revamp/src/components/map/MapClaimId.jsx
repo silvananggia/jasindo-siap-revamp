@@ -275,17 +275,18 @@ const MapRegister = () => {
     }
   }, [nik, claimid, token, dispatch]);
 
-  // Fetch klaim data when component mounts or nik/noPolis/token changes
+  // Fetch klaim data when component mounts or nik/claimid/token changes
   useEffect(() => {
-    if (nik && noPolis && token) {
-      dispatch(getKlaimUser(nik, noPolis));
+    if (nik && claimid && token) {
+      dispatch(getKlaimUser(nik, claimid));
     }
-  }, [nik, noPolis, token, dispatch]);
+  }, [nik, claimid, token, dispatch]);
 
-  // Style registered klaim in the main layer
+  // Style registered klaim in the main layer - apply style when listKlaim changes or after loading
   useEffect(() => {
-    if (!polygonLayerRef.current) return;
+    if (!polygonLayerRef.current || !mapInstance.current) return;
     
+    // Apply style even during loading to show any existing registered klaim
     const detailData = getDetailData();
     const jmlPetak = detailData?.jmlPetak || 0;
     
@@ -296,19 +297,38 @@ const MapRegister = () => {
     const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
     const isLimitReached = totalPetak >= jmlPetak;
     
+    // Apply style to show registered klaim (lahan terdaftar)
     polygonLayerRef.current.setStyle(getPercilStyle(selectedPercils, lockedIDs, isLimitReached));
     polygonLayerRef.current.changed();
     
     // Update cursor style based on limit
-    if (mapInstance.current) {
-      const mapElement = mapInstance.current.getViewport();
-      if (isLimitReached) {
-        mapElement.style.cursor = 'not-allowed';
-      } else {
-        mapElement.style.cursor = 'pointer';
-      }
+    const mapElement = mapInstance.current.getViewport();
+    if (isLimitReached) {
+      mapElement.style.cursor = 'not-allowed';
+    } else {
+      mapElement.style.cursor = 'pointer';
     }
-  }, [selectedPercils, listKlaim, detailAnggotaData, mapInstance]);
+  }, [selectedPercils, listKlaim, detailAnggotaData, mapInstance, polygonLayerRef, klaimLoading]);
+
+  // Ensure style is applied when layer is first ready and data is available
+  useEffect(() => {
+    if (!polygonLayerRef.current || !mapInstance.current) return;
+    if (!nik || !claimid) return;
+    
+    // Trigger style update when layer is ready and we have claim data
+    // This ensures lahan terdaftar is shown on first load
+    const currentListKlaim = listKlaim || [];
+    const lockedIDs = currentListKlaim.map(p => p.idpetak);
+    const detailData = getDetailData();
+    const jmlPetak = detailData?.jmlPetak || 0;
+    const totalRegisteredKlaim = currentListKlaim.length;
+    const totalSelectedPetak = selectedPercils.length;
+    const totalPetak = totalRegisteredKlaim + totalSelectedPetak;
+    const isLimitReached = totalPetak >= jmlPetak;
+    
+    polygonLayerRef.current.setStyle(getPercilStyle(selectedPercils, lockedIDs, isLimitReached));
+    polygonLayerRef.current.changed();
+  }, [polygonLayerRef, mapInstance, nik, claimid]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -379,7 +399,7 @@ const MapRegister = () => {
       setSelectedPercils([]);
       
       // Refresh the klaim list to show newly saved klaim in "Lahan Terdaftar"
-      await dispatch(getKlaimUser(nik, noPolis));
+      await dispatch(getKlaimUser(nik, claimid));
       
       Swal.fire({
         icon: "success",
@@ -402,8 +422,8 @@ const MapRegister = () => {
       await dispatch(deleteKlaim(klaimId));
       // console.log('MapClaim.handleDeleteKlaim: deleteKlaim completed');
       // Refresh the klaim list after deletion
-      if (nik && noPolis) {
-        await dispatch(getKlaimUser(nik, noPolis));
+      if (nik && claimid) {
+        await dispatch(getKlaimUser(nik, claimid));
       }
       // console.log('MapClaim.handleDeleteKlaim: getKlaimUser completed');
     } catch (error) {
