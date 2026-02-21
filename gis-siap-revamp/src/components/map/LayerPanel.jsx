@@ -16,33 +16,40 @@ const LayerPanel = ({
   const theme = useTheme();
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: isMobile ? 1 : 2, 
-        paddingTop: isMobile ? '15px' : '20px',
-        flexWrap: isMobile ? 'wrap' : 'nowrap'
+        gap: 1, 
+        paddingTop: '15px',
+        paddingBottom: '8px',
+        flexWrap: 'nowrap',
+        width: '100%',
+        maxWidth: '100%'
       }}>
-        <Typography variant={isMobile ? "body2" : "caption"}>Layer Petak</Typography>
+        <Typography variant="caption" sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}>Layer Petak</Typography>
         <Switch
           checked={isPolygonVisible}
           onChange={(e) => setIsPolygonVisible(e.target.checked)}
-          size={isMobile ? "small" : "medium"}
+          size="small"
+          sx={{ flexShrink: 0 }}
         />
-        <Divider />
+        <Box sx={{ flexGrow: 1 }} />
+        <Divider orientation="vertical" flexItem sx={{ height: '20px', mx: 0.5 }} />
       </Box>
 
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: isMobile ? 1 : 2,
-          width: isMobile ? '100%' : isTablet ? '280px' : '300px',
+          gap: 1,
+          width: '100%',
+          maxWidth: '100%',
           mb: 2,
+          px: 0
         }}
       >
-        <OpacityIcon fontSize={isMobile ? "small" : "medium"} />
+        <OpacityIcon fontSize="small" sx={{ flexShrink: 0 }} />
         <Slider
           value={polygonOpacity}
           min={0}
@@ -51,12 +58,12 @@ const LayerPanel = ({
           aria-label="Opacity"
           valueLabelDisplay='auto'
           onChange={(e, value) => setPolygonOpacity(value)}
-          sx={{ flexGrow: 1 }}
-          size={isMobile ? "small" : "medium"}
+          sx={{ flexGrow: 1, minWidth: 0 }}
+          size="small"
         />
       </Box>
 
-      <Divider />
+      <Divider sx={{ mb: 1 }} />
 
       <BasemapSwitcher
         selectedBasemap={selectedBasemap}
