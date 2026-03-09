@@ -769,7 +769,7 @@ const MapAnalytic = () => {
                 aria-controls="productivity-content"
                 id="productivity-header"
               >
-                <Typography>Analisis Banjir</Typography>
+                <Typography>Analisis Air</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <LineChart
@@ -780,7 +780,7 @@ const MapAnalytic = () => {
                   series={[
                     {
                       data: chartData.floodData,
-                      label: "Banjir",
+                      label: "Air",
                       color: "#4e79a7",
                     },
                   ]}
@@ -800,7 +800,7 @@ const MapAnalytic = () => {
                 aria-controls="drought-content"
                 id="drought-header"
               >
-                <Typography>Analisis Kekeringan</Typography>
+                <Typography>Analisis Bera</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <LineChart
@@ -811,7 +811,7 @@ const MapAnalytic = () => {
                   series={[
                     {
                       data: chartData.droughtData,
-                      label: "Kekeringan",
+                      label: "Bera",
                       color: "#e15759",
                     },
                   ]}

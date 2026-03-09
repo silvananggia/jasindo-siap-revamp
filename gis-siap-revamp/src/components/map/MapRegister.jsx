@@ -340,7 +340,7 @@ const MapRegister = () => {
     process.env.REACT_APP_GOOGLE_API_KEY,
     handlePercilSelect,
 
-    `petak_kecamatan/{z}/{x}/{y}?id=${idkec}`,
+    `petak_kabupaten/{z}/{x}/{y}?id=${idkab}`,
   );
 
   useEffect(() => {
@@ -475,7 +475,7 @@ const MapRegister = () => {
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current || !idkec) return;
 
-    const newTileUrl = `petak_kecamatan/{z}/{x}/{y}?id=${idkec}`;
+    const newTileUrl = `petak_kabupaten/{z}/{x}/{y}?id=${idkab}`;
     setTileUrl(newTileUrl);
 
     // Create new source with updated URL

@@ -29,15 +29,21 @@ import DataPanel from './DataPanel';
 import LayerPanel from './LayerPanel';
 
 const MapViewClaim = () => {
+  const normalizeToken = (rawToken) => {
+    if (!rawToken || typeof rawToken !== 'string') {
+      return null;
+    }
+    return rawToken.replace(/^Bearer\s+/i, '').trim() || null;
+  };
   
   const dispatch = useDispatch();
   const location = useLocation();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const { loading, errmessage } = useSelector((state) => state.auth);
+  const { loading, errmessage, token: storedToken } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
 
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(normalizeToken(storedToken));
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
   const [nik, setNik] = useState('');
   const [noPolis, setNoPolis] = useState('');
@@ -135,7 +141,8 @@ const MapViewClaim = () => {
   useEffect(() => {
     const handleMessage = (e) => {
       if (e.data && e.data.token) {
-        const tokenValue = e.data.token;
+        const tokenValue = normalizeToken(e.data.token);
+        if (!tokenValue) return;
         setToken(tokenValue); // Set local state
         dispatch(setTokenAction(tokenValue)); // Store in Redux for axios interceptor
       }
@@ -160,6 +167,13 @@ const MapViewClaim = () => {
   }, [mapInstance, dispatch]);
 
   useEffect(() => {
+    const normalizedStoredToken = normalizeToken(storedToken);
+    if (normalizedStoredToken && normalizedStoredToken !== token) {
+      setToken(normalizedStoredToken);
+    }
+  }, [storedToken, token]);
+
+  useEffect(() => {
     setTotalArea(selectedPercils.reduce(
       (sum, p) => sum + parseFloat(p.area || 0),
       0
@@ -175,7 +189,9 @@ const MapViewClaim = () => {
 
   // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis && token) {
+    const canFetchProtectedData = nik && noPolis && token;
+
+    if (canFetchProtectedData) {
       //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
       dispatch(detailAnggotaKlaim(nik, noPolis, token))
         .then((response) => {
@@ -197,7 +213,9 @@ const MapViewClaim = () => {
 
   // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis && token) {
+    const canFetchProtectedData = nik && noPolis && token;
+
+    if (canFetchProtectedData) {
       dispatch(getKlaimUser(nik, noPolis));
     }
   }, [nik, noPolis, token, dispatch]);

@@ -1412,7 +1412,7 @@ const MapAnggotaKlaim = () => {
                 id="productivity-header"
                 sx={{ width: '100%', minHeight: '40px' }}
               >
-                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Banjir</Typography>
+                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Air</Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ width: '100%', padding: '12px' }}>
                 <Box className="chart-container">
@@ -1440,7 +1440,7 @@ const MapAnggotaKlaim = () => {
                     series={[
                       {
                         data: chartData.floodData,
-                        label: "Banjir",
+                        label: "Air",
                         color: "#4e79a7",
                       },
                     ]}
@@ -1463,7 +1463,7 @@ const MapAnggotaKlaim = () => {
                 id="drought-header"
                 sx={{ width: '100%', minHeight: '40px' }}
               >
-                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Kekeringan</Typography>
+                <Typography sx={{ fontSize: '0.85rem' }}>Analisis Bera</Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ width: '100%', padding: '12px' }}>
                 <Box className="chart-container">
@@ -1491,7 +1491,7 @@ const MapAnggotaKlaim = () => {
                     series={[
                       {
                         data: chartData.droughtData,
-                        label: "Kekeringan",
+                        label: "Bera",
                         color: "#e15759",
                       },
                     ]}

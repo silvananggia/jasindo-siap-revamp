@@ -185,9 +185,9 @@ const MapAnggotaKlaim = () => {
 
           setChartData({
             dates: satEpoch,
-            // Banjir chart uses Water index
+            // Air chart uses Water index
             floodData: waterData,
-            // Kekeringan chart uses Bare index
+            // Bera chart uses Bare index
             droughtData: bareData,
             // Vegetasi chart uses NDPI index
             rainfallData: ndpiData,
@@ -1755,7 +1755,7 @@ const MapAnggotaKlaim = () => {
                         sx={{ padding: '4px' }}
                       />
                     }
-                    label={<Typography sx={{ fontSize: '0.7rem' }}>Kekeringan (Bare)</Typography>}
+                    label={<Typography sx={{ fontSize: '0.7rem' }}>Bera (Bare)</Typography>}
                   />
                   <FormControlLabel
                     control={
@@ -1777,7 +1777,7 @@ const MapAnggotaKlaim = () => {
                         sx={{ padding: '4px' }}
                       />
                     }
-                    label={<Typography sx={{ fontSize: '0.7rem' }}>Banjir (Water)</Typography>}
+                    label={<Typography sx={{ fontSize: '0.7rem' }}>Air (Water)</Typography>}
                   />
                 </Box>
               </Box>
@@ -1824,7 +1824,7 @@ const MapAnggotaKlaim = () => {
                         ? [
                           {
                             data: chartData.droughtData,
-                            label: "Kekeringan (Bare)",
+                            label: "Bera (Bare)",
                             color: "#e15759",
                             showMark: false,
                             curve: "linear",
@@ -1846,7 +1846,7 @@ const MapAnggotaKlaim = () => {
                         ? [
                           {
                             data: chartData.floodData,
-                            label: "Banjir (Water)",
+                            label: "Air (Water)",
                             color: "#4e79a7",
                             showMark: false,
                             curve: "linear",

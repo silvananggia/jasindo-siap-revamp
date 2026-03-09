@@ -7,9 +7,9 @@ import { Box, Tabs, Tab, IconButton, Snackbar, Alert } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ListIcon from '@mui/icons-material/List';
 import LayersIcon from '@mui/icons-material/Layers';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import Swal from 'sweetalert2';
 import { fromLonLat } from 'ol/proj';
+import { buffer } from 'ol/extent';
 import { VectorTile as VectorTileLayer } from 'ol/layer';
 import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
@@ -21,6 +21,7 @@ import { handleSearch } from '../../utils/mapUtils';
 import { getPercilStyle } from '../../utils/percilStyles';
 import { createKlaim, getKlaimID, deleteKlaim, getKlaimUser } from '../../actions/klaimActions';
 import { detailAnggotaKlaim } from '../../actions/anggotaActions';
+import { getPetakById, getPetakUser } from '../../actions/petakActions';
 import { setToken as setTokenAction } from '../../actions/authActions';
 import BasemapSwitcher from './BasemapSwitcher';
 import GeolocationControl from './GeolocationControl';
@@ -36,6 +37,7 @@ const MapRegister = () => {
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
+  const { loading: petakLoading, petaklist: listPetakUser } = useSelector((state) => state.petak);
 
   const [token, setToken] = useState(null);
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
@@ -64,6 +66,7 @@ const MapRegister = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [tileUrl, setTileUrl] = useState();
+  const hasAutoZoomedRegisteredRef = useRef(false);
 
   // Check if Google Maps API is loaded
   useEffect(() => {
@@ -179,11 +182,6 @@ const MapRegister = () => {
         if (e.data.claimid) setClaimid(e.data.claimid);
         if (e.data.address) {
           setSearchInput(e.data.address);
-          setTimeout(() => {
-            if (mapInstance.current) {
-              handleSearch(e.data.address, mapInstance.current, process.env.REACT_APP_GOOGLE_API_KEY);
-            }
-          }, 1000);
         }
       }
     };
@@ -272,6 +270,13 @@ const MapRegister = () => {
     }
   }, [nik, noPolis, token, dispatch]);
 
+  // Fetch petak user data for panel list
+  useEffect(() => {
+    if (nik && token) {
+      dispatch(getPetakUser(nik));
+    }
+  }, [nik, token, dispatch]);
+
   // Style registered klaim in the main layer
   useEffect(() => {
     if (!polygonLayerRef.current) return;
@@ -343,18 +348,28 @@ const MapRegister = () => {
 
   const handleSimpan = async () => {
     const detailData = getDetailData();
-    if (!nik || !claimid || !noPolis) {
+    if (!nik || !noPolis) {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Data nik, claimid atau noPolis tidak tersedia.",
+        text: "Data nik atau noPolis tidak tersedia.",
       });
       return;
     }
 
+    if (!selectedPercils.length) {
+      Swal.fire({
+        icon: "warning",
+        title: "Perhatian",
+        text: "Belum ada petak yang dipilih.",
+      });
+      return;
+    }
+
+    const claimIdForPayload = claimid || noPolis;
     const payload = selectedPercils.map(p => ({
       nik,
-      claimid: claimid,
+      claimid: claimIdForPayload,
       nopolis: noPolis,
       idpetak: p.id,
       luas: p.area,
@@ -369,7 +384,7 @@ const MapRegister = () => {
       setSelectedPercils([]);
       
       // Refresh the klaim list to show newly saved klaim in "Lahan Terdaftar"
-      await dispatch(getKlaimUser(nik, claimid, noPolis));
+      await dispatch(getKlaimUser(nik, noPolis));
       
       Swal.fire({
         icon: "success",
@@ -402,6 +417,55 @@ const MapRegister = () => {
     }
   };
 
+  const zoomToRegisteredPetak = useCallback(async (petak) => {
+    if (!petak || !mapInstance.current) return;
+
+    const petakDbId = petak.idpuser || petak.id;
+    if (!petakDbId) return false;
+
+    try {
+      const exactPetakData = await dispatch(getPetakById(petakDbId));
+      const petakData = exactPetakData?.data;
+      const view = mapInstance.current.getView();
+
+      const waitMoveEnd = () => new Promise((resolve) => {
+        let resolved = false;
+        const finish = () => {
+          if (resolved) return;
+          resolved = true;
+          resolve(true);
+        };
+        mapInstance.current.once('moveend', finish);
+        setTimeout(finish, 1800);
+      });
+
+      if (petakData?.center?.coordinates) {
+        view.animate({
+          center: fromLonLat([petakData.center.coordinates[0], petakData.center.coordinates[1]]),
+          zoom: 20,
+          duration: 1000,
+        });
+        return await waitMoveEnd();
+      }
+
+      if (petakData?.bounds) {
+        const extent = [
+          petakData.bounds.minX, petakData.bounds.minY,
+          petakData.bounds.maxX, petakData.bounds.maxY
+        ];
+        view.fit(buffer(extent, 25), {
+          duration: 1000,
+          padding: [25, 25, 25, 25]
+        });
+        return await waitMoveEnd();
+      }
+      return false;
+    } catch (error) {
+      console.error('Error zooming to registered petak:', error);
+      return false;
+    }
+  }, [dispatch, mapInstance]);
+
   // Update polygon layer when nik changes
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current || !nik) return;
@@ -419,6 +483,54 @@ const MapRegister = () => {
     polygonLayerRef.current.setSource(newSource);
     polygonLayerRef.current.changed();
   }, [nik, mapInstance, polygonLayerRef]);
+
+  useEffect(() => {
+    hasAutoZoomedRegisteredRef.current = false;
+  }, [nik, noPolis]);
+
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    if (!token) return;
+    if (hasAutoZoomedRegisteredRef.current) return;
+
+    const firstPetak = (Array.isArray(listPetakUser) && listPetakUser.length > 0)
+      ? listPetakUser[0]
+      : (Array.isArray(listKlaim) && listKlaim.length > 0 ? listKlaim[0] : null);
+
+    if (!firstPetak) {
+      return;
+    }
+
+    let cancelled = false;
+    let timer = null;
+    const MAX_ZOOM_ATTEMPTS = 5;
+    const RETRY_INTERVAL_MS = 1000;
+    const INITIAL_DELAY_MS = 400;
+    const tryZoom = async (attempt = 1) => {
+      if (cancelled || hasAutoZoomedRegisteredRef.current) return;
+
+      const isZoomed = await zoomToRegisteredPetak(firstPetak);
+      if (cancelled) return;
+
+      if (isZoomed) {
+        hasAutoZoomedRegisteredRef.current = true;
+        return;
+      }
+
+      if (attempt >= MAX_ZOOM_ATTEMPTS) {
+        return;
+      }
+
+      timer = setTimeout(() => tryZoom(attempt + 1), RETRY_INTERVAL_MS);
+    };
+
+    timer = setTimeout(() => tryZoom(1), INITIAL_DELAY_MS);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [listPetakUser, listKlaim, zoomToRegisteredPetak, mapInstance, token]);
 
   useAuthListener();
 
@@ -513,10 +625,12 @@ const MapRegister = () => {
                 isValid={isValid}
                 onSave={handleSimpan}
                 polygonLayerRef={polygonLayerRef}
-                listPetak={listKlaim}
+                listPetak={listPetakUser}
+                klaimList={listKlaim}
                 source="MapClaim"
-                isLoading={klaimLoading}
+                isLoading={klaimLoading || petakLoading}
                 onDeletePetak={handleDeleteKlaim}
+                onRefreshData={() => dispatch(getPetakUser(nik))}
                 mapInstance={mapInstance}
               />
             );
@@ -540,6 +654,7 @@ const MapRegister = () => {
               }}
             />
           )}
+
         </Box>
       </div>
 

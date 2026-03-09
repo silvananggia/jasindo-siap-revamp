@@ -6,8 +6,9 @@ const checkAuth = (token) => {
   };
   
   if (token) {
+    const normalizedToken = token.replace(/^Bearer\s+/i, "").trim();
     config.headers = {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${normalizedToken}`
     };
   }
   

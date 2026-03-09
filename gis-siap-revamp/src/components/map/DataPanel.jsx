@@ -39,6 +39,7 @@ const DataPanel = ({
   onSave,
   polygonLayerRef,
   listPetak,
+  klaimList = [],
   source, // 'MapView' or 'MapRegister'
   isLoading,
   onDeletePetak, // Function to delete petak from database
@@ -56,6 +57,17 @@ const DataPanel = ({
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(isMobile ? 3 : 5);
   const [hoveredId, setHoveredId] = useState(null);
+  const normalizeId = (value) => (value === null || value === undefined ? '' : String(value));
+  const isMapClaim = source === 'MapClaim';
+  const registeredList = isMapClaim ? (Array.isArray(klaimList) ? klaimList : []) : (Array.isArray(listPetak) ? listPetak : []);
+  const registeredCount = registeredList.length;
+  const registeredTotalArea = registeredList.reduce((sum, p) => sum + parseFloat(p.luas || 0), 0);
+  const lockedIDs = registeredList.map((p) => p.idpetak || p.id).filter(Boolean);
+  const klaimByPetakId = (Array.isArray(klaimList) ? klaimList : []).reduce((acc, item) => {
+    const key = normalizeId(item.idpetak);
+    if (key) acc[key] = item;
+    return acc;
+  }, {});
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -99,8 +111,7 @@ const DataPanel = ({
         }
         
         // Return default style for non-matching features using the same logic
-        const lockedIDs = (listPetak || []).map(p => p.idpetak);
-        const totalRegisteredPetak = (listPetak || []).length;
+        const totalRegisteredPetak = registeredCount;
         const totalSelectedPetak = selectedPercils.length;
         const totalPetak = totalRegisteredPetak + totalSelectedPetak;
         const isLimitReached = totalPetak >= formData.jmlPetak;
@@ -120,8 +131,7 @@ const DataPanel = ({
     
     // Reset main layer style
     if (polygonLayerRef.current) {
-      const lockedIDs = (listPetak || []).map(p => p.idpetak);
-      const totalRegisteredPetak = (listPetak || []).length;
+      const totalRegisteredPetak = registeredCount;
       const totalSelectedPetak = selectedPercils.length;
       const totalPetak = totalRegisteredPetak + totalSelectedPetak;
       const isLimitReached = totalPetak >= formData.jmlPetak;
@@ -154,13 +164,17 @@ const DataPanel = ({
        
       } else if (source === 'MapClaim') {
         // For MapClaim, use getPetakById
-        const petakData = listPetak?.find(p => p.idpetak === petakId);
+        const petakData = listPetak?.find(
+          p => normalizeId(p.idpetak || p.id || p.petak_id) === normalizeId(petakId)
+        );
        
         if (!petakData) {
           // console.warn('Petak data not found for ID:', petakId);
           return;
         }
-        exactPetakData = await dispatch(getPetakById(petakData.idpuser));
+        const dbId = petakData.idpuser || petakData.id;
+        if (!dbId) return;
+        exactPetakData = await dispatch(getPetakById(dbId));
       } else {
         // For other sources, find the petak data to get the database ID
         const petakData = listPetak?.find(p => p.idpetak === petakId || p.id === petakId);
@@ -306,8 +320,7 @@ const DataPanel = ({
           
           // Update map style
           if (polygonLayerRef.current) {
-            const lockedIDs = (listPetak || []).map(p => p.idpetak);
-            const totalRegisteredPetak = (listPetak || []).length;
+            const totalRegisteredPetak = registeredCount;
             const totalSelectedPetak = updated.length;
             const totalPetak = totalRegisteredPetak + totalSelectedPetak;
             const isLimitReached = totalPetak >= formData.jmlPetak;
@@ -368,8 +381,10 @@ const DataPanel = ({
             fontSize: isMobile ? '0.875rem' : '1rem'
           }}>
             Total Luas Keseluruhan: {(
-              ((Array.isArray(listPetak) ? listPetak : []).reduce((sum, p) => sum + parseFloat(p.luas || 0), 0)) + 
-              (selectedPercils.reduce((sum, p) => sum + parseFloat(p.area || 0), 0))
+              (
+                registeredTotalArea +
+                selectedPercils.reduce((sum, p) => sum + parseFloat(p.area || 0), 0)
+              )
             ).toFixed(2)} ha
           </Typography>
         </Box>
@@ -397,19 +412,19 @@ const DataPanel = ({
       {/* Status indicator for MapRegister */}
       {(source === 'MapRegister' || source === 'MapClaim') && (
         <Box mt={1} p={isMobile ? 1 : 1.5} borderRadius={1} sx={{ 
-          backgroundColor: ((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak ? '#ffebee' : '#e8f5e8',
-          border: `1px solid ${((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak ? '#f44336' : '#4caf50'}`,
+          backgroundColor: (registeredCount + selectedPercils.length) >= formData.jmlPetak ? '#ffebee' : '#e8f5e8',
+          border: `1px solid ${(registeredCount + selectedPercils.length) >= formData.jmlPetak ? '#f44336' : '#4caf50'}`,
           mb: 2
         }}>
           <Typography variant={isMobile ? "body2" : "body1"} sx={{ 
-            color: ((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak ? '#d32f2f' : '#2e7d32',
+            color: (registeredCount + selectedPercils.length) >= formData.jmlPetak ? '#d32f2f' : '#2e7d32',
             fontWeight: 'bold',
             fontSize: isMobile ? '0.875rem' : '1rem'
           }}>
             Status: {isLoading ? 'Memuat data...' : (
-              ((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak 
-                ? `Tidak dapat memilih petak baru (${(listPetak ? listPetak.length : 0) + selectedPercils.length}/${formData.jmlPetak})`
-                : `Dapat memilih petak (${(listPetak ? listPetak.length : 0) + selectedPercils.length}/${formData.jmlPetak})`
+              (registeredCount + selectedPercils.length) >= formData.jmlPetak 
+                ? `Tidak dapat memilih petak baru (${registeredCount + selectedPercils.length}/${formData.jmlPetak})`
+                : `Dapat memilih petak (${registeredCount + selectedPercils.length}/${formData.jmlPetak})`
             )}
           </Typography>
           {isLoading && (
@@ -419,7 +434,7 @@ const DataPanel = ({
           )}
           {!isLoading && (
             <Typography variant="caption" sx={{ color: '#666', display: 'block', mt: 0.5 }}>
-              Data terdaftar: {listPetak ? listPetak.length : 0} petak tersimpan
+              Data terdaftar: {registeredCount} petak tersimpan
             </Typography>
           )}
         </Box>
@@ -446,7 +461,6 @@ const DataPanel = ({
           </IconButton>
         )}
       </Box>
-      
       {listPetak && listPetak.length > 0 ? (
         <>
           <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
@@ -459,6 +473,8 @@ const DataPanel = ({
               {listPetak.map((p) => {
                 const itemId = p.idpuser;
                 const itemIdForDisplay = p.idpetak || 'N/A';
+                const klaimRecord = klaimByPetakId[normalizeId(itemIdForDisplay)];
+                const isKlaimTerdaftar = Boolean(klaimRecord);
                 
                 return (
                   <Card 
@@ -477,8 +493,11 @@ const DataPanel = ({
                     <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             ID: {itemIdForDisplay}
+                            {isMapClaim && isKlaimTerdaftar && (
+                              <Chip label="Klaim" size="small" color="success" variant="outlined" />
+                            )}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Luas: {parseFloat(p.luas || 0).toFixed(2)} ha
@@ -496,12 +515,25 @@ const DataPanel = ({
                           >
                             <ZoomInIcon fontSize="small" />
                           </IconButton>
-                          {(source === 'MapRegister' || source === 'MapClaim') && (
+                          {source === 'MapRegister' && (
                             <IconButton
                               aria-label={`Hapus Lahan ${itemIdForDisplay}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeletePetak(p.id, true);
+                              }}
+                              size="small"
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                          {isMapClaim && isKlaimTerdaftar && (
+                            <IconButton
+                              aria-label={`Hapus Klaim Lahan ${itemIdForDisplay}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePetak(klaimRecord.id, true);
                               }}
                               size="small"
                               color="error"
@@ -530,6 +562,8 @@ const DataPanel = ({
                 {listPetak.map((p) => {
                   const itemId = p.idpuser;
                   const itemIdForDisplay = p.idpetak || 'N/A';
+                  const klaimRecord = klaimByPetakId[normalizeId(itemIdForDisplay)];
+                  const isKlaimTerdaftar = Boolean(klaimRecord);
                   
                   return (
                     <TableRow 
@@ -542,9 +576,14 @@ const DataPanel = ({
                       }}
                     >
                       <TableCell>
-                        <Typography variant={isMobile ? "caption" : "body2"}>
-                          {itemIdForDisplay}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Typography variant={isMobile ? "caption" : "body2"}>
+                            {itemIdForDisplay}
+                          </Typography>
+                          {isMapClaim && isKlaimTerdaftar && (
+                            <Chip label="Klaim" size="small" color="success" variant="outlined" />
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant={isMobile ? "caption" : "body2"}>
@@ -564,12 +603,25 @@ const DataPanel = ({
                           >
                             <ZoomInIcon fontSize="small" />
                           </IconButton>
-                          {(source === 'MapRegister' || source === 'MapClaim') && (
+                          {source === 'MapRegister' && (
                             <IconButton
                               aria-label={`Hapus Lahan ${itemIdForDisplay}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeletePetak(p.id, true);
+                              }}
+                              size="small"
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                          {isMapClaim && isKlaimTerdaftar && (
+                            <IconButton
+                              aria-label={`Hapus Klaim Lahan ${itemIdForDisplay}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePetak(klaimRecord.id, true);
                               }}
                               size="small"
                               color="error"
@@ -601,7 +653,7 @@ const DataPanel = ({
 
       {/* Selected Petak List */}
       {(source === 'MapRegister' || source === 'MapClaim') && (() => {
-        const availablePetak = Math.max(0, formData.jmlPetak - (listPetak ? listPetak.length : 0));
+        const availablePetak = Math.max(0, formData.jmlPetak - registeredCount);
         
         if (availablePetak === 0 && selectedPercils.length === 0) {
           return null;
@@ -616,7 +668,7 @@ const DataPanel = ({
               Total Luas: {selectedPercils.reduce((sum, p) => sum + parseFloat(p.area || 0), 0).toFixed(2)} ha
             </Typography>
             
-            {((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak && (
+            {(registeredCount + selectedPercils.length) >= formData.jmlPetak && (
               <Box mt={1} p={isMobile ? 1 : 1.5} borderRadius={1} sx={{ 
                 backgroundColor: '#fff3cd',
                 border: '1px solid #ffeaa7',
@@ -634,9 +686,9 @@ const DataPanel = ({
             
             <Box sx={{ width: '100%', mb: 1 }}>
               <Box sx={{ 
-                width: `${Math.min(100, (((listPetak ? listPetak.length : 0) + selectedPercils.length) / formData.jmlPetak) * 100)}%`,
+                width: `${Math.min(100, ((registeredCount + selectedPercils.length) / formData.jmlPetak) * 100)}%`,
                 height: 4,
-                backgroundColor: ((listPetak ? listPetak.length : 0) + selectedPercils.length) >= formData.jmlPetak ? '#f44336' : '#4caf50',
+                backgroundColor: (registeredCount + selectedPercils.length) >= formData.jmlPetak ? '#f44336' : '#4caf50',
                 borderRadius: 2,
                 transition: 'width 0.3s ease'
               }} />
