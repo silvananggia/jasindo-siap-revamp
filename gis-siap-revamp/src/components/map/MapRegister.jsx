@@ -117,6 +117,9 @@ const MapRegister = () => {
           // Handle nested response structure: result.data.data.status and result.data.data.data
           if (result && result.data && result.data.status === 200 && result.data.data) {
             const data = result.data.data;
+            // Normalize luasLahan: API might return luasLahan, luas_lahan, or luas
+            const luasLahanFromApi = data.luasLahan ?? data.luas_lahan ?? data.luas;
+            const hasLuasLahan = luasLahanFromApi !== undefined && luasLahanFromApi !== null && luasLahanFromApi !== '';
             // Store the API response data directly
             setFormResponse(prev => ({
               ...prev,
@@ -126,7 +129,7 @@ const MapRegister = () => {
               address: data.address || prev.address,
               idkab: data.idkab || prev.idkab,
               idkec: data.idkec || prev.idkec,
-              luasLahan: data.luasLahan || prev.luasLahan,
+              luasLahan: hasLuasLahan ? String(luasLahanFromApi) : prev.luasLahan,
               jmlPetak: data.jmlPetak || prev.jmlPetak,
               musimTanam: data.musimTanam || prev.musimTanam,
               tanggalTanam: data.tanggalTanam || prev.tanggalTanam,

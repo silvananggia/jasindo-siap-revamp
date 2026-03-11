@@ -9,6 +9,7 @@ import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
 import { toGeometry } from 'ol/render/Feature';
 import GeoJSON from 'ol/format/GeoJSON';
+import { getArea as getGeodesicArea } from 'ol/sphere';
 import { createBasemapLayer } from '../utils/mapUtils';
 import { getPercilStyle } from '../utils/percilStyles';
 
@@ -81,20 +82,38 @@ export const useMap = (isAuthenticated, googleApiKey, onPercilSelect, tileUrl) =
 
           geometryGeoJSON = addZDimension(geometryGeoJSON);
 
-          const id = feature.get('psid');
-          const petakid = feature.get('idpetak'); // Fix: use idpetak instead of petak_id
-          const area = feature.get('luas');
-          
           // Extract all feature properties
           const allProperties = feature.getProperties();
-          
-          // Create percilData object with all properties
+
+          // IDs (tile key can vary) — sesuaikan dengan gis-siap
+          const psid =
+            feature.get('psid') ??
+            allProperties?.psid ??
+            feature.get('id') ??
+            allProperties?.id;
+
+          const petak_id =
+            feature.get('petak_id') ??
+            allProperties?.petak_id ??
+            feature.get('idpetak') ??
+            allProperties?.idpetak ??
+            feature.get('petakid') ??
+            allProperties?.petakid;
+
+          // Luas: selalu hitung dari geometri (geodesik) seperti di gis-siap — m² -> ha
+          const areaM2 = getGeodesicArea(geometryClone, { projection: targetProjection });
+          const area = Number.isFinite(areaM2) ? areaM2 / 10000 : 0;
+
+          // Create percilData (kompatibel MapRegister: .psid, .petak_id, .area)
           const percilData = {
-            id,
-            petakid,
+            psid,
+            id: psid,
+            petak_id,
+            petakid: petak_id,
+            idpetak: petak_id,
             area,
             geometry: geometryGeoJSON,
-            ...allProperties // Spread all other properties
+            ...allProperties
           };
 
           onPercilSelect(percilData);
