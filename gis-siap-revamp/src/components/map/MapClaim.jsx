@@ -15,6 +15,7 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
@@ -38,8 +39,9 @@ const MapRegister = () => {
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
   const { loading: petakLoading, petaklist: listPetakUser } = useSelector((state) => state.petak);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(authToken);
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
   const [nik, setNik] = useState('');
   const [noPolis, setNoPolis] = useState('');
@@ -169,6 +171,12 @@ const MapRegister = () => {
   }, [location.search]);
 
   useEffect(() => {
+    if (authToken && authToken !== token) {
+      setToken(authToken);
+    }
+  }, [authToken, token]);
+
+  useEffect(() => {
     const handleMessage = (e) => {
       if (e.data && e.data.token) {
         const tokenValue = e.data.token;
@@ -243,9 +251,10 @@ const MapRegister = () => {
 
   // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis && token) {
-      //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
-      dispatch(detailAnggotaKlaim(nik, noPolis, token))
+    if (!isAuthReady) return;
+    const activeToken = authToken || token;
+    if (nik && noPolis && activeToken) {
+      dispatch(detailAnggotaKlaim(nik, noPolis, activeToken))
         .then((response) => {
          // console.log('detailAnggotaKlaim response:', response);
           if (response) {
@@ -261,21 +270,23 @@ const MapRegister = () => {
           console.error('Error fetching detailAnggotaKlaim:', error);
         });
     }
-  }, [nik, noPolis, token, dispatch]);
+  }, [nik, noPolis, token, authToken, dispatch, isAuthReady]);
 
   // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && noPolis && token) {
+    if (!isAuthReady) return;
+    if (nik && noPolis && (authToken || token)) {
       dispatch(getKlaimUser(nik, noPolis));
     }
-  }, [nik, noPolis, token, dispatch]);
+  }, [nik, noPolis, token, authToken, dispatch, isAuthReady]);
 
   // Fetch petak user data for panel list
   useEffect(() => {
-    if (nik && token) {
+    if (!isAuthReady) return;
+    if (nik) {
       dispatch(getPetakUser(nik));
     }
-  }, [nik, token, dispatch]);
+  }, [nik, token, authToken, dispatch, isAuthReady]);
 
   // Style registered klaim in the main layer
   useEffect(() => {
@@ -367,15 +378,25 @@ const MapRegister = () => {
     }
 
     const claimIdForPayload = claimid || noPolis;
-    const payload = selectedPercils.map(p => ({
-      nik,
-      claimid: claimIdForPayload,
-      nopolis: noPolis,
-      idpetak: p.id,
-      luas: p.area,
-      geometry: p.geometry,
-      tglKejadian: detailData?.tgl_kejadian || detailData?.tglKejadian || '',
-    }));
+    const payload = selectedPercils.map(p => {
+      const petakCode = p.petakid || p.petak_id || p.idpetak || p.id;
+      const matchedUser = (listPetakUser || []).find((u) =>
+        String(u.id) === String(p.id) ||
+        String(u.idpetak) === String(petakCode) ||
+        String(u.idpetak) === String(p.id)
+      );
+
+      return {
+        nik,
+        claimid: claimIdForPayload,
+        nopolis: noPolis,
+        // Prefer petak_user UUID; backend copies exact geometry from DB
+        idpetak: matchedUser?.id || p.id,
+        luas: matchedUser?.luas ?? p.area,
+        geometry: p.geometry,
+        tglKejadian: detailData?.tgl_kejadian || detailData?.tglKejadian || '',
+      };
+    });
 
     try {
       await dispatch(createKlaim(payload));

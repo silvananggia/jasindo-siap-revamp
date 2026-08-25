@@ -14,6 +14,7 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
@@ -32,6 +33,7 @@ const MapRegister = () => {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { loading, errmessage } = useSelector((state) => state.auth);
   const listPetak  = useSelector((state) => state.petak.petaklist);
+  const { isAuthReady, token } = useAuthReady();
 
   // Get nik and idKelompok from URL parameters
   const nikFromUrl = new URLSearchParams(location.search).get('nik') || '';
@@ -39,9 +41,6 @@ const MapRegister = () => {
 
   const [isDataLoaded, setIsDataLoaded] = useState(!!(nikFromUrl || idKelompokFromUrl));
   const [isFetchingDetail, setIsFetchingDetail] = useState(false);
-  
-  // Get token from Redux store (set by useAuthListener)
-  const token = useSelector((state) => state.auth?.token);
   
   // Store form response data from API
   const [formResponse, setFormResponse] = useState({
@@ -91,8 +90,8 @@ const MapRegister = () => {
         return;
       }
       
-      // Token is now automatically added by axios interceptor, but we still need to wait for it
-      if (currentNik && currentIdKelompok && token && !isFetchingDetail) {
+      // Wait until auth + token are ready before protected API calls
+      if (currentNik && currentIdKelompok && isAuthReady && !isFetchingDetail) {
         setIsFetchingDetail(true);
         try {
           // Token is automatically added by axios interceptor, no need to pass it explicitly
@@ -137,7 +136,7 @@ const MapRegister = () => {
     };
 
     fetchDetailPeserta();
-  }, [dispatch, nikFromUrl, idKelompokFromUrl, token]);
+  }, [dispatch, nikFromUrl, idKelompokFromUrl, isAuthReady]);
 
   // Initialize all form values as reactive variables using useMemo from formResponse
   const formDataValues = React.useMemo(() => {
@@ -376,23 +375,13 @@ const MapRegister = () => {
 
   useAuthListener();
 
-  // Track if petak has been fetched for current NIK to prevent re-fetching
-  const petakFetchedRef = React.useRef(null);
-  
   useEffect(() => {
-   // console.log("MapView - Current formResponse:", formResponse);
-   // console.log("MapView - isDataLoaded:", isDataLoaded);
+    if (!isAuthReady) return;
+    const currentNik = (nik || '').trim();
+    if (!currentNik) return;
 
-    // Wait for token to be available before making API calls
-    // Only fetch if NIK has changed or hasn't been fetched yet
-    if (nik && nik.trim() !== '' && token && petakFetchedRef.current !== nik) {
-      //console.log("MapView - Fetching petak data for NIK:", nik);
-      dispatch(getPetakUser(nik));
-      petakFetchedRef.current = nik; // Mark as fetched for this NIK
-    } else {
-     // console.log("MapView - No NIK available or token not ready, skipping petak data fetch");
-    }
-  }, [nik, dispatch, token]);
+    dispatch(getPetakUser(currentNik));
+  }, [isAuthReady, nik, dispatch]);
 
   if (loading) {
     return <Spinner className="content-loader" />;

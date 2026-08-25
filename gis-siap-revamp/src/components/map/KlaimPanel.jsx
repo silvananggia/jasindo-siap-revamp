@@ -20,8 +20,9 @@ import { getPercilStyle } from '../../utils/percilStyles';
 import { Style, Stroke, Fill } from 'ol/style';
 import { getKlaimUser } from "../../actions/klaimActions";
 import { getAnggotaKlaim, getAnggota } from "../../actions/anggotaActions";
+import { useAuthReady } from '../../hooks/useAuthReady';
 
-const DataPanel = ({
+const KlaimPanel = ({
   formData,
   selectedPercils,
   setSelectedPercils,
@@ -35,32 +36,20 @@ const DataPanel = ({
 }) => {
   const dispatch = useDispatch();
   const { anggotalist } = useSelector((state) => state.anggota);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
   const [hoveredId, setHoveredId] = useState(null);
   const [debugInfo, setDebugInfo] = useState({});
 
-  const [token, setToken] = useState(null);
-
-  // Listen for token from postMessage
+  // Fetch default list when auth is ready
   useEffect(() => {
-    const handleMessage = (e) => {
-      if (e.data && e.data.token) {
-        setToken(e.data.token);
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // Fetch default list when component mounts
-  useEffect(() => {
-    if (formData.idKelompok && formData.noPolis && token) {
-      dispatch(getAnggota(formData.idKelompok, token));
-      console.log("KlaimPanel - anggotalist:", anggotalist);
+    if (!isAuthReady || !authToken) return;
+    if (formData.idKelompok && formData.noPolis) {
+      dispatch(getAnggota(formData.idKelompok, authToken));
     }
-  }, [dispatch, formData.idKelompok, formData.noPolis, token]);
+  }, [dispatch, formData.idKelompok, formData.noPolis, isAuthReady, authToken]);
 
   // Debug effect to log anggotalist changes
   useEffect(() => {
@@ -84,11 +73,8 @@ const DataPanel = ({
 
   const handleReloadAnggota = () => {
     const nopolis = formData.noPolis || debugInfo.nopolis;
-    if (nopolis && token) {
-      console.log("Reloading anggota data with nopolis:", nopolis);
-      dispatch(getAnggotaKlaim(nopolis, token));
-    } else {
-      console.log("Cannot reload anggota - missing nopolis or token");
+    if (nopolis && isAuthReady && authToken) {
+      dispatch(getAnggotaKlaim(nopolis, authToken));
     }
   };
 
@@ -293,4 +279,4 @@ const DataPanel = ({
   );
 };
 
-export default DataPanel;
+export default KlaimPanel;

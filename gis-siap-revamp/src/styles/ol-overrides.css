@@ -1,0 +1,15 @@
+/* ol.css sets `all: unset` on canvases and is imported after index.css.
+   That resets color-scheme, so Chrome/OS dark mode paints OL canvases black
+   and hides the basemap while vector markers still show. */
+.ol-viewport,
+.ol-layer,
+.ol-basemap,
+.ol-petak-mvt {
+  color-scheme: only light !important;
+}
+
+.ol-viewport canvas {
+  color-scheme: only light !important;
+  background-color: transparent !important;
+  display: block !important;
+}

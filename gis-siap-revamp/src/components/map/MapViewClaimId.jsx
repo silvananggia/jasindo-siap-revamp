@@ -15,6 +15,7 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
@@ -36,6 +37,7 @@ const MapViewClaim = () => {
   const { loading, errmessage, token: storedToken } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
   const [token, setToken] = useState(storedToken || null);
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
@@ -141,7 +143,10 @@ const MapViewClaim = () => {
     if (storedToken && storedToken !== token) {
       setToken(storedToken);
     }
-  }, [storedToken, token]);
+    if (authToken && authToken !== token) {
+      setToken(authToken);
+    }
+  }, [storedToken, authToken, token]);
 
   useEffect(() => {
     const handleMessage = (e) => {
@@ -186,9 +191,10 @@ const MapViewClaim = () => {
 
   // Fetch detail anggota klaim data after authentication is confirmed
   useEffect(() => {
-    if (!isAuthenticated || loading || !claimid || !token) return;
+    const activeToken = authToken || token;
+    if (!isAuthReady || !claimid || !activeToken) return;
 
-    dispatch(detailAnggotaKlaimId(nik || '', claimid, token))
+    dispatch(detailAnggotaKlaimId(nik || '', claimid, activeToken))
       .then((response) => {
         if (response) {
           setDetailAnggotaData(response);
@@ -245,14 +251,15 @@ const MapViewClaim = () => {
       .catch((error) => {
         console.error('Error fetching detailAnggotaKlaim:', error);
       });
-  }, [claimid, token, dispatch, isAuthenticated, loading, nik]);
+  }, [claimid, token, authToken, dispatch, isAuthReady, nik]);
 
   // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && claimid && token) {
+    if (!isAuthReady) return;
+    if (nik && claimid && (authToken || token)) {
       dispatch(getKlaimUser(nik, claimid));
     }
-  }, [nik, claimid, token, dispatch]);
+  }, [nik, claimid, token, authToken, dispatch, isAuthReady]);
 
   // Debug: Log klaim data
   useEffect(() => {

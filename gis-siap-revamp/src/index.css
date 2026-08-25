@@ -73,6 +73,16 @@ code {
   left: auto !important;
 }
 
+/* Keep OL canvases transparent. Shared className + OS dark mode
+   otherwise clears the basemap canvas to black while vector markers still show. */
+.ol-viewport {
+  color-scheme: only light;
+}
+
+.ol-viewport canvas {
+  background-color: transparent;
+}
+
 /* Custom CSS for positioning the GeolocationBar */
 .geolocation-control {
   bottom: 120px !important;

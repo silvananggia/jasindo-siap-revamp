@@ -15,6 +15,7 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
@@ -42,6 +43,7 @@ const MapViewClaim = () => {
   const { loading, errmessage, token: storedToken } = useSelector((state) => state.auth);
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
   const [token, setToken] = useState(normalizeToken(storedToken));
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
@@ -168,10 +170,14 @@ const MapViewClaim = () => {
 
   useEffect(() => {
     const normalizedStoredToken = normalizeToken(storedToken);
+    const normalizedAuthToken = normalizeToken(authToken);
     if (normalizedStoredToken && normalizedStoredToken !== token) {
       setToken(normalizedStoredToken);
     }
-  }, [storedToken, token]);
+    if (normalizedAuthToken && normalizedAuthToken !== token) {
+      setToken(normalizedAuthToken);
+    }
+  }, [storedToken, authToken, token]);
 
   useEffect(() => {
     setTotalArea(selectedPercils.reduce(
@@ -189,11 +195,11 @@ const MapViewClaim = () => {
 
   // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    const canFetchProtectedData = nik && noPolis && token;
+    const activeToken = token || authToken;
+    const canFetchProtectedData = isAuthReady && nik && noPolis && activeToken;
 
     if (canFetchProtectedData) {
-      //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
-      dispatch(detailAnggotaKlaim(nik, noPolis, token))
+      dispatch(detailAnggotaKlaim(nik, noPolis, activeToken))
         .then((response) => {
         //  console.log('detailAnggotaKlaim response:', response);
           if (response) {
@@ -209,16 +215,16 @@ const MapViewClaim = () => {
           console.error('Error fetching detailAnggotaKlaim:', error);
         });
     }
-  }, [nik, noPolis, token, dispatch]);
+  }, [nik, noPolis, token, authToken, dispatch, isAuthReady]);
 
   // Fetch klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    const canFetchProtectedData = nik && noPolis && token;
+    const canFetchProtectedData = isAuthReady && nik && noPolis && (token || authToken);
 
     if (canFetchProtectedData) {
       dispatch(getKlaimUser(nik, noPolis));
     }
-  }, [nik, noPolis, token, dispatch]);
+  }, [nik, noPolis, token, authToken, dispatch, isAuthReady]);
 
   // Debug: Log klaim data
   useEffect(() => {

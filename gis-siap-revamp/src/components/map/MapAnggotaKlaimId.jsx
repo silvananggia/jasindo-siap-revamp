@@ -23,6 +23,7 @@ import MVT from "ol/format/MVT";
 import { Rnd } from 'react-rnd';
 import { useMap } from "../../hooks/useMap";
 import { useAuthListener } from "../../hooks/useAuthListener";
+import { useAuthReady } from "../../hooks/useAuthReady";
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from "../../utils/mapUtils";
 import { handleSearch } from "../../utils/mapUtils";
@@ -50,6 +51,7 @@ const MapAnggotaKlaim = () => {
   const { loading, errmessage, token: storedToken } = useSelector((state) => state.auth);
   const { anggotalist, loading: anggotaLoading } = useSelector((state) => state.anggota);
   const { petaklist, loading: petakLoading } = useSelector((state) => state.petak);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
   const [token, setToken] = useState(storedToken || null);
 
@@ -121,6 +123,18 @@ const MapAnggotaKlaim = () => {
     }
     // For objects or primitives, wrap in array
     return [value];
+  };
+
+  const EMPTY_CHART_DATA = {
+    dates: [],
+    floodData: [],
+    droughtData: [],
+    rainfallData: [],
+  };
+
+  const applyEmptyChart = () => {
+    setChartData(EMPTY_CHART_DATA);
+    setTanamCountLast2Years(null);
   };
 
   const handlePercilSelect = useCallback(
@@ -206,11 +220,8 @@ const MapAnggotaKlaim = () => {
           }
         } catch (apiError) {
           console.error("Error loading petak analytics:", apiError);
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "Gagal memuat data analisis petak.",
-          });
+          applyEmptyChart();
+          setChartPanelVisible(true);
         }
       } catch (err) {
         Swal.fire({
@@ -294,7 +305,10 @@ const MapAnggotaKlaim = () => {
     if (storedToken && storedToken !== token) {
       setToken(storedToken);
     }
-  }, [storedToken, token]);
+    if (authToken && authToken !== token) {
+      setToken(authToken);
+    }
+  }, [storedToken, authToken, token]);
 
   useEffect(() => {
     const handleMessage = (e) => {
@@ -433,13 +447,12 @@ const MapAnggotaKlaim = () => {
 
     const claimIdValue = getClaimid();
 
-    if (claimIdValue && token) {
-      //console.log('Dispatching getAnggotaKlaim:', { nopolis, token });
-      dispatch(getAnggotaKlaimId(claimIdValue, token));
-    } else {
-      // console.log('Not dispatching getAnggotaKlaim - missing:', { nopolis: !nopolis, token: !token });
+    if (!isAuthReady) return;
+    const activeToken = authToken || token;
+    if (claimIdValue && activeToken) {
+      dispatch(getAnggotaKlaimId(claimIdValue, activeToken));
     }
-  }, [location.search, currentAnggotaIndex, token, dispatch]);
+  }, [location.search, currentAnggotaIndex, token, authToken, dispatch, isAuthReady]);
 
   // Update search input from response
   useEffect(() => {
@@ -816,11 +829,9 @@ const MapAnggotaKlaim = () => {
       setChartPanelVisible(true);
     } catch (apiError) {
       console.error("Error loading petak analytics:", apiError);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Gagal memuat data analisis petak.",
-      });
+      applyEmptyChart();
+      await zoomToPetak(petak);
+      setChartPanelVisible(true);
     }
   };
 
@@ -1805,6 +1816,7 @@ const MapAnggotaKlaim = () => {
                     alignItems: 'center',
                   }}
                 >
+                  {(chartData.dates || []).length > 0 ? (
                   <LineChart
                     xAxis={[
                       {
@@ -1876,6 +1888,7 @@ const MapAnggotaKlaim = () => {
                       }
                     }}
                   />
+                  ) : null}
                 </Box>
               </Box>
             </>

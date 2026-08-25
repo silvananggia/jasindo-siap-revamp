@@ -7,67 +7,37 @@ import {
 
 import AnalisisService from "../services/analisisService";
 
-export const getTanamPetak = (id) => async (dispatch) => {
-    try {
-        const res = await AnalisisService.getTanamPetak(id);
+const emptyAnalisisPayload = {
+    code: 404,
+    status: "error",
+    data: null,
+};
 
+const isNotFound = (err) => err?.response?.status === 404;
+
+const fetchAnalisis = (serviceFn, type) => (id) => async (dispatch) => {
+    try {
+        const res = await serviceFn(id);
         dispatch({
-            type: GET_TANAM_PETAK,
+            type,
             payload: res.data,
         });
-
-        return Promise.resolve(res.data);
+        return res.data;
     } catch (err) {
+        if (isNotFound(err)) {
+            dispatch({
+                type,
+                payload: emptyAnalisisPayload,
+            });
+            return emptyAnalisisPayload;
+        }
+
         console.log(err);
         return Promise.reject(err);
     }
 };
 
-export const getNDPIAnalisis = (id) => async (dispatch) => {
-    try {
-        const res = await AnalisisService.getNDPIAnalisis(id);
-
-        dispatch({
-            type: GET_NDPI_ANALISIS,
-            payload: res.data,
-        });
-
-        return Promise.resolve(res.data);
-    } catch (err) {
-        console.log(err);
-        return Promise.reject(err);
-    }
-};
-
-export const getWaterAnalisis = (id) => async (dispatch) => {
-    try {
-        const res = await AnalisisService.getWaterAnalisis(id);
-
-        dispatch({
-            type: GET_WATER_ANALISIS,
-            payload: res.data,
-        });
-
-        return Promise.resolve(res.data);
-    } catch (err) {
-        console.log(err);
-        return Promise.reject(err);
-    }
-};
-
-export const getBareAnalisis = (id) => async (dispatch) => {
-    try {
-        const res = await AnalisisService.getBareAnalisis(id);
-
-        dispatch({
-            type: GET_BARE_ANALISIS,
-            payload: res.data,
-        });
-
-        return Promise.resolve(res.data);
-    } catch (err) {
-        console.log(err);
-        return Promise.reject(err);
-    }
-};
-
+export const getTanamPetak = fetchAnalisis(AnalisisService.getTanamPetak, GET_TANAM_PETAK);
+export const getNDPIAnalisis = fetchAnalisis(AnalisisService.getNDPIAnalisis, GET_NDPI_ANALISIS);
+export const getWaterAnalisis = fetchAnalisis(AnalisisService.getWaterAnalisis, GET_WATER_ANALISIS);
+export const getBareAnalisis = fetchAnalisis(AnalisisService.getBareAnalisis, GET_BARE_ANALISIS);

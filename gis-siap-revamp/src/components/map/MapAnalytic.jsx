@@ -18,6 +18,7 @@ import VectorTileSource from "ol/source/VectorTile";
 import MVT from "ol/format/MVT";
 import { useMap } from "../../hooks/useMap";
 import { useAuthListener } from "../../hooks/useAuthListener";
+import { useAuthReady } from "../../hooks/useAuthReady";
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from "../../utils/mapUtils";
 import { handleSearch } from "../../utils/mapUtils";
@@ -43,8 +44,9 @@ const MapAnalytic = () => {
   const { loading, errmessage } = useSelector((state) => state.auth);
   const { anggotalist, loading: anggotaLoading } = useSelector((state) => state.anggota);
   const { petaklist, loading: petakLoading } = useSelector((state) => state.petak);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(authToken);
   const [formData, setFormData] = useState({
     nik: '',
     nama: '',
@@ -324,13 +326,19 @@ const MapAnalytic = () => {
     "18 May'24",
   ];
 
-  useEffect( () => {
-    if (formData && formData.idKelompok && token) {
-      console.log('formData:', formData);
-      console.log('formData.idKelompok:', formData.idKelompok);
-      dispatch(getAnggota(formData.idKelompok, token));
+  useEffect(() => {
+    if (authToken && authToken !== token) {
+      setToken(authToken);
     }
-  },[formData.idKelompok, token]);
+  }, [authToken, token]);
+
+  useEffect( () => {
+    if (!isAuthReady) return;
+    const activeToken = authToken || token;
+    if (formData?.idKelompok && activeToken) {
+      dispatch(getAnggota(formData.idKelompok, activeToken));
+    }
+  },[formData.idKelompok, token, authToken, isAuthReady, dispatch]);
   // Update polygon layer when formData changes
   useEffect(() => {
     if (!polygonLayerRef.current || !mapInstance.current) return;

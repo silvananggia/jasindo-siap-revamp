@@ -14,6 +14,17 @@ const initialstate = {
     errmessage: "",
 };
 
+function uniquifyPetakList(list) {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list.filter((item) => {
+        const key = String(item?.id || item?.idpetak || '');
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 function petakReducer(petak = initialstate, action) {
     const { type, payload } = action;
 
@@ -52,8 +63,7 @@ function petakReducer(petak = initialstate, action) {
             return {
                 ...petak,
                 loading: false,
-                petaklist: action.payload, // action.payload is already the API response object
-
+                petaklist: uniquifyPetakList(action.payload),
             };
         case GET_PETAK_ID:
             return {

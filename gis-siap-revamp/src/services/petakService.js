@@ -143,6 +143,42 @@ const checkPercilAvailability = (idpetak, musim_tanam, tgl_tanam, token = null) 
   return axios.get(`/check-percil-availability`, config);
 };
 
+const getPetakPointsByExtent = ({ minx, miny, maxx, maxy, nik }, token = null) => {
+  const config = {
+    params: { minx, miny, maxx, maxy, nik },
+  };
+
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  return axios.get('/petak-points-extent', config);
+};
+
+const checkPetakBatch = (data, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return axios.post('/check-petak-batch', data, config);
+};
+
+const getPetakGeoJSON = (nik, token = null) => {
+  const config = {
+    params: { nik },
+  };
+  if (token) {
+    config.headers = {
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return axios.get('/petak-geojson', config);
+};
+
 const PetakService = {
     getPetakAll,
     getPetakUser,
@@ -154,7 +190,10 @@ const PetakService = {
     createPetak,
     updatePetak,
     deletePetak,
-    checkPercilAvailability
+    checkPercilAvailability,
+    getPetakPointsByExtent,
+    checkPetakBatch,
+    getPetakGeoJSON,
 };
 
 export default PetakService;

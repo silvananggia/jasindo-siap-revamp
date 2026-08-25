@@ -82,12 +82,18 @@ export const getPetakUser = (id) => async (dispatch) => {
         }
         const res = await PetakService.getPetakUser(id);
      
+        const payload = Array.isArray(res.data?.data)
+            ? res.data.data
+            : (Array.isArray(res.data) ? res.data : []);
         dispatch({
             type: GET_PETAK_USER,
-            payload: res.data.data || [], // Extract the actual array from the API response
+            payload,
         });
         
-        return Promise.resolve(res.data);
+        return Promise.resolve({
+            ...res.data,
+            data: payload,
+        });
     } catch (err) {
         console.log(err);
         return Promise.reject(err);

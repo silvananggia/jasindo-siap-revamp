@@ -15,6 +15,7 @@ import VectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useMap } from '../../hooks/useMap';
 import { useAuthListener } from '../../hooks/useAuthListener';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import { useLocation } from 'react-router-dom';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch } from '../../utils/mapUtils';
@@ -38,6 +39,7 @@ const MapRegister = () => {
   const { loading: klaimLoading } = useSelector((state) => state.klaim);
   const listKlaim = useSelector((state) => state.klaim.klaimlist);
   const { loading: petakLoading, petaklist: listPetakUser } = useSelector((state) => state.petak);
+  const { isAuthReady, token: authToken } = useAuthReady();
 
   const [token, setToken] = useState(storedToken || null);
   const [detailAnggotaData, setDetailAnggotaData] = useState(null);
@@ -176,7 +178,10 @@ const MapRegister = () => {
     if (storedToken && storedToken !== token) {
       setToken(storedToken);
     }
-  }, [storedToken, token]);
+    if (authToken && authToken !== token) {
+      setToken(authToken);
+    }
+  }, [storedToken, authToken, token]);
 
   useEffect(() => {
     const handleMessage = (e) => {
@@ -253,9 +258,10 @@ const MapRegister = () => {
 
   // Fetch detail anggota klaim data when component mounts or nik/noPolis/token changes
   useEffect(() => {
-    if (nik && claimid && token) {
-      //console.log('Dispatching detailAnggotaKlaim:', { nik, noPolis, token: !!token });
-      dispatch(detailAnggotaKlaimId(nik, claimid, token))
+    if (!isAuthReady) return;
+    const activeToken = authToken || token;
+    if (nik && claimid && activeToken) {
+      dispatch(detailAnggotaKlaimId(nik, claimid, activeToken))
         .then((response) => {
          // console.log('detailAnggotaKlaim response:', response);
           if (response) {
@@ -271,21 +277,23 @@ const MapRegister = () => {
           console.error('Error fetching detailAnggotaKlaim:', error);
         });
     }
-  }, [nik, claimid, token, dispatch]);
+  }, [nik, claimid, token, authToken, dispatch, isAuthReady]);
 
   // Fetch klaim data when component mounts or nik/claimid/token changes
   useEffect(() => {
-    if (nik && claimid && token) {
+    if (!isAuthReady) return;
+    if (nik && claimid && (authToken || token)) {
       dispatch(getKlaimUser(nik, claimid));
     }
-  }, [nik, claimid, token, dispatch]);
+  }, [nik, claimid, token, authToken, dispatch, isAuthReady]);
 
   // Fetch petak user data for panel list
   useEffect(() => {
-    if (nik && token) {
+    if (!isAuthReady) return;
+    if (nik) {
       dispatch(getPetakUser(nik));
     }
-  }, [nik, token, dispatch]);
+  }, [nik, token, authToken, dispatch, isAuthReady]);
 
   // Style registered klaim in the main layer - apply style when listKlaim changes or after loading
   useEffect(() => {
@@ -377,15 +385,25 @@ const MapRegister = () => {
     }
 
     const claimIdForPayload = claimid || noPolis;
-    const payload = selectedPercils.map(p => ({
-      nik,
-      claimid: claimIdForPayload,
-      nopolis: noPolis,
-      idpetak: p.id,
-      luas: p.area,
-      geometry: p.geometry,
-      tglKejadian: detailData?.tgl_kejadian || detailData?.tglKejadian || '',
-    }));
+    const payload = selectedPercils.map(p => {
+      const petakCode = p.petakid || p.petak_id || p.idpetak || p.id;
+      const matchedUser = (listPetakUser || []).find((u) =>
+        String(u.id) === String(p.id) ||
+        String(u.idpetak) === String(petakCode) ||
+        String(u.idpetak) === String(p.id)
+      );
+
+      return {
+        nik,
+        claimid: claimIdForPayload,
+        nopolis: noPolis,
+        // Prefer petak_user UUID; backend copies exact geometry from DB
+        idpetak: matchedUser?.id || p.id,
+        luas: matchedUser?.luas ?? p.area,
+        geometry: p.geometry,
+        tglKejadian: detailData?.tgl_kejadian || detailData?.tglKejadian || '',
+      };
+    });
 
     try {
       await dispatch(createKlaim(payload));
