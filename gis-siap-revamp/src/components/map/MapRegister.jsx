@@ -21,11 +21,8 @@ import UndoIcon from '@mui/icons-material/Undo';
 import CheckIcon from '@mui/icons-material/Check';
 import Swal from 'sweetalert2';
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
-import { VectorTile as VectorTileLayer } from 'ol/layer';
 import VectorLayer from 'ol/layer/Vector';
-import VectorTileSource from 'ol/source/VectorTile';
 import VectorSource from 'ol/source/Vector';
-import MVT from 'ol/format/MVT';
 import GeoJSON from 'ol/format/GeoJSON';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
@@ -39,7 +36,6 @@ import { useLocation } from 'react-router-dom';
 import useSwipeGesture from '../../hooks/useSwipeGesture';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch, boundsToMapExtent, fitViewToExtent, toMapCoordinate } from '../../utils/mapUtils';
-import { getPercilStyle } from '../../utils/percilStyles';
 import { createPetak, getPetakUser, deletePetak, getPetakById, getCenterPetakUser } from '../../actions/petakActions';
 import { processPetakPoints } from '../../services/petakGenService';
 import PetakService from '../../services/petakService';
@@ -519,7 +515,7 @@ const MapRegister = () => {
   }, [formResponse]);
 
   // Destructure for easier access
-  const { nik, nama, address, idkab, idkec, jmlPetak, luasLahan, noPolis, idKelompok, idKlaim } = formDataValues;
+  const { nik, nama, address, jmlPetak, luasLahan, noPolis, idKelompok, idKlaim } = formDataValues;
 
   const [searchInput, setSearchInput] = useState('');
   const [selectedPercils, setSelectedPercils] = useState([]);
@@ -532,7 +528,6 @@ const MapRegister = () => {
   const [isValid, setIsValid] = useState(true);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
-  const [tileUrl, setTileUrl] = useState();
   const [panelOpen, setPanelOpen] = useState(!isMobile); // Panel closed by default on mobile
   const [pointCount, setPointCount] = useState(0);
   const [markedPoints, setMarkedPoints] = useState([]);
@@ -656,11 +651,12 @@ const MapRegister = () => {
     );
   }, []);
 
+  // Martin petak tiles (petak_kabupaten) intentionally disabled on register map
   const { mapRef, mapInstance, polygonLayerRef, basemapLayerRef, mapReady } = useMap(
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     () => {},
-    idkab ? `petak_kabupaten/{z}/{x}/{y}?id=${idkab}` : '',
+    '',
     { enableFeatureClick: false, initialZoom: 5, initialCenter: [118, -2] },
   );
 
@@ -1103,9 +1099,9 @@ const MapRegister = () => {
   }, [selectedPercils, markedPoints, totalArea, jmlPetak, luasLahan, listPetak, isDataLoaded, petakFetched]);
 
   useEffect(() => {
+    // Keep Martin MVT layer hidden; only toggle user-drawn/generated polygons
     if (polygonLayerRef.current) {
-      polygonLayerRef.current.setVisible(isPolygonVisible);
-      polygonLayerRef.current.setOpacity(polygonOpacity);
+      polygonLayerRef.current.setVisible(false);
     }
     if (generatedLayerRef.current) {
       generatedLayerRef.current.setVisible(isPolygonVisible);
@@ -1556,56 +1552,6 @@ const MapRegister = () => {
   };
 
 
-  // Separate effect for tile URL updates (only when kecamatan changes)
-  useEffect(() => {
-    if (!polygonLayerRef.current || !mapInstance.current || !idkec) return;
-
-    const newTileUrl = `petak_kabupaten/{z}/{x}/{y}?id=${idkab}`;
-    setTileUrl(newTileUrl);
-
-    // Create new source with updated URL
-    const newSource = new VectorTileSource({
-      format: new MVT(),
-      url: `${process.env.REACT_APP_TILE_URL}/${newTileUrl}`,
-    });
-
-    // Update the layer's source and make it visible
-    polygonLayerRef.current.setSource(newSource);
-    polygonLayerRef.current.setVisible(true);
-    polygonLayerRef.current.changed();
-  }, [idkec, mapInstance, polygonLayerRef]);
-
-
-
-  // Style registered petak in the main layer
-  useEffect(() => {
-    if (!polygonLayerRef.current) return;
-
-    // Use a more stable approach - get the current listPetak from Redux state
-    const currentListPetak = listPetak || [];
-    const lockedIDs = currentListPetak.map(p => p.idpetak || p.id);
-    const totalRegisteredPetak = currentListPetak.length;
-    const totalSelectedPetak = selectedPercils.length;
-    const totalPetak = totalRegisteredPetak + totalSelectedPetak;
-    const isLimitReached = totalPetak >= jmlPetak;
-
-
-
-    polygonLayerRef.current.setStyle(getPercilStyle(selectedPercils, lockedIDs, isLimitReached));
-    polygonLayerRef.current.changed();
-
-    // Update cursor style based on limit
-    if (mapInstance.current) {
-      const mapElement = mapInstance.current.getViewport();
-      if (isLimitReached) {
-        mapElement.style.cursor = 'not-allowed';
-      } else {
-        mapElement.style.cursor = 'crosshair';
-      }
-    }
-  }, [selectedPercils, listPetak, jmlPetak, mapInstance]);
-
-  
 
   // Function to zoom to exact petak data by ID
   const zoomToPetakData = useCallback(async (petakList) => {
