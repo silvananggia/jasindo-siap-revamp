@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend-gis-revamp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend_gis_revamp_api_dev
+   
+    ports:
+      - "8082:8082"
+    extra_hosts:
+      - "service-dev-jasindo-revampsiap-be.apps.okd.asuransijasindo.co.id:192.168.54.112"
+    networks:
+      gisnet:
+        aliases:
+          - backend-gis-revamp-dev.docker
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  gisnet:
+    external: true
+

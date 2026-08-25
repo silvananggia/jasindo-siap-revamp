@@ -4,6 +4,8 @@ const petakUserController = require('../controllers/petakUser.controller');
 
 
 router.post('/save-petak', petakUserController.savePetakUser)
+router.post('/check-petak-batch', petakUserController.checkPetakBatch)
+router.get('/petak-points-extent', petakUserController.listPetakPointsByExtent)
 router.get('/petak-user/:id', petakUserController.listPetakUser)
 router.get('/point-petak-user/:id', petakUserController.pointPetakUser)
 router.get('/list-point-petak-user/:id', petakUserController.listPointPetakUser)

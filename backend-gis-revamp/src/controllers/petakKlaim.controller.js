@@ -16,31 +16,69 @@ exports.savePetakKlaim = async (req, res) => {
     return res.status(400).json({ error: 'Invalid or empty list of percils' });
   }
 
-  const insertValues = [];
-  const insertQueryParts = [];
+  try {
+    const insertValues = [];
+    const insertQueryParts = [];
 
-  // Loop through each percils and prepare the values for insertion
-  percils.forEach((percils, index) => {
-    const { nik, claimid,nopolis, idpetak, luas, geometry, tglKejadian } = percils;
+    for (let index = 0; index < percils.length; index++) {
+      const item = percils[index];
+      const { nik, claimid, nopolis, idpetak, tglKejadian } = item;
 
-    if (!nik || !claimid || !nopolis || !idpetak || !luas || !geometry) {
-      return res.status(400).json({ error: `Missing required fields in percils ${index + 1}` });
+      if (!nik || !claimid || !nopolis || !idpetak) {
+        return res.status(400).json({ error: `Missing required fields in percils ${index + 1}` });
+      }
+
+      // Always copy exact geometry from petak_user.
+      // Client geometry comes from MVT tiles (quantized/simplified) and looks jagged.
+      const petakResult = await db.query(
+        `
+        SELECT
+          id,
+          luas,
+          CASE
+            WHEN ST_SRID(geometry) IN (0, 4326) THEN ST_SetSRID(ST_Force2D(geometry), 4326)
+            ELSE ST_Transform(ST_Force2D(geometry), 4326)
+          END AS geometry_4326
+        FROM petak_user
+        WHERE id::text = $1 OR idpetak = $1
+        LIMIT 1
+        `,
+        [String(idpetak)]
+      );
+
+      if (petakResult.rows.length === 0) {
+        return res.status(404).json({
+          error: `Petak user tidak ditemukan untuk idpetak ${idpetak}`,
+        });
+      }
+
+      const petakUser = petakResult.rows[0];
+      const luas =
+        Number.isFinite(parseFloat(item.luas)) && parseFloat(item.luas) > 0
+          ? parseFloat(item.luas)
+          : parseFloat(petakUser.luas) || 0;
+
+      const id = uuidv4();
+      insertValues.push(
+        id,
+        nik,
+        claimid,
+        nopolis,
+        petakUser.id,
+        luas,
+        petakUser.geometry_4326,
+        tglKejadian || null
+      );
+      insertQueryParts.push(
+        `($${index * 8 + 1}, $${index * 8 + 2}, $${index * 8 + 3}, $${index * 8 + 4}, $${index * 8 + 5}, $${index * 8 + 6}, ST_Force3D($${index * 8 + 7}::geometry), $${index * 8 + 8})`
+      );
     }
 
-    const id = uuidv4(); // Generate a unique UUID for each percils
-
-    // Prepare the query part and corresponding values for batch insert
-    insertValues.push(id, nik, claimid, nopolis, idpetak, luas, JSON.stringify(geometry), tglKejadian || null);
-    insertQueryParts.push(`($${index * 8 + 1}, $${index * 8 + 2}, $${index * 8 + 3}, $${index * 8 + 4}, $${index * 8 + 5}, $${index * 8 + 6}, ST_GeomFromGeoJSON($${index * 8 + 7}), $${index * 8 + 8})`);
-  });
-
-  const insertQuery = `
+    const insertQuery = `
       INSERT INTO petak_klaim (id, nik, claimid, nopolis, idpetak, luas, geometry, tgl_kejadian)
       VALUES ${insertQueryParts.join(', ')}
-  `;
+    `;
 
-  try {
-    // Execute the batch insert query
     await db.query(insertQuery, insertValues);
 
     res.status(201).json({ message: `${percils.length} percils saved successfully` });

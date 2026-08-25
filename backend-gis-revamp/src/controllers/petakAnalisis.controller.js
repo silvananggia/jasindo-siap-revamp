@@ -4,38 +4,54 @@ const crypto = require("crypto");
 const { promisify } = require('util');
 const axios = require("axios");
 const { v4: uuidv4 } = require('uuid');
-const { getBearerToken } = require("../utils/auth");
 
+const PETAK_SUMMARY_COLUMNS = {
+  tanam: "petak_id, tanam_last2th",
+  ndpi: "petak_id, ndpi_val_last2th, sat_epoch",
+  water: "petak_id, water_val_last2th, sat_epoch",
+  bare: "petak_id, bare_val_last2th, sat_epoch",
+};
+
+async function findPetakSummary(petakId, columns) {
+  const result = await db2.query(
+    `
+    SELECT ${columns}
+    FROM petak_summary
+    WHERE petak_id = $1
+       OR replace(petak_id, '.', '') = replace($1::text, '.', '')
+    LIMIT 1
+    `,
+    [petakId]
+  );
+
+  return result.rows[0] || null;
+}
+
+function notFound(res) {
+  return res.status(404).json({
+    code: 404,
+    status: "error",
+    data: "Petak not found",
+  });
+}
+
+function serverError(res, error) {
+  console.error("Error getting petak by ID:", error);
+  return res.status(500).json({
+    code: 500,
+    status: "error",
+    data: "Internal Server Error",
+  });
+}
 
 exports.getTanamPetak = async (req, res) => {
-  const token = getBearerToken(req, res);
-  if (!token) return;
-
   try {
-    const petakId = req.params.id;
+    const data = await findPetakSummary(req.params.id, PETAK_SUMMARY_COLUMNS.tanam);
 
-    // Get the exact petak by ID with geometry for precise zooming
-    const result = await db2.query(
-      `
-      SELECT 
-        petak_id,
-        tanam_last2th
-      FROM petak_summary
-      WHERE petak_id = $1
-      `,
-      [petakId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        status: "error",
-        data: "Petak not found",
-      });
+    if (!data) {
+      return notFound(res);
     }
 
-    const data = result.rows[0];
-    
     res.json({
       code: 200,
       status: "success",
@@ -44,97 +60,41 @@ exports.getTanamPetak = async (req, res) => {
         tanam_last2th: data.tanam_last2th
       },
     });
-
   } catch (error) {
-    console.error("Error getting petak by ID:", error);
-    res.status(500).json({
-      code: 500,
-      status: "error",
-      data: "Internal Server Error",
-    });
+    return serverError(res, error);
   }
 };
 
 exports.getNDPIAnalisis = async (req, res) => {
-  const token = getBearerToken(req, res);
-  if (!token) return;
-
   try {
-    const petakId = req.params.id;
+    const data = await findPetakSummary(req.params.id, PETAK_SUMMARY_COLUMNS.ndpi);
 
-    // Get the exact petak by ID with geometry for precise zooming
-    const result = await db2.query(
-      `
-      SELECT 
-        petak_id,
-        ndpi_val_last2th,
-        sat_epoch
-      FROM petak_summary
-      WHERE petak_id = $1
-      `,
-      [petakId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        status: "error",
-        data: "Petak not found",
-      });
+    if (!data) {
+      return notFound(res);
     }
 
-    const data = result.rows[0];
-    
     res.json({
       code: 200,
       status: "success",
       data: {
         petak_id: data.petak_id,
         ndpi_val_last2th: data.ndpi_val_last2th,
-        sat_epoch: data.sat_epoch 
+        sat_epoch: data.sat_epoch
       },
     });
-
   } catch (error) {
-    console.error("Error getting petak by ID:", error);
-    res.status(500).json({
-      code: 500,
-      status: "error",
-      data: "Internal Server Error",
-    });
+    return serverError(res, error);
   }
 };
 
 exports.getWaterAnalisis = async (req, res) => {
-  const token = getBearerToken(req, res);
-  if (!token) return;
-
   try {
-    const petakId = req.params.id;
+    const data = await findPetakSummary(req.params.id, PETAK_SUMMARY_COLUMNS.water);
 
-    // Get the exact petak by ID with geometry for precise zooming
-    const result = await db2.query(
-      `
-      SELECT 
-        petak_id,
-        water_val_last2th,
-        sat_epoch
-      FROM petak_summary
-      WHERE petak_id = $1
-      `,
-      [petakId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        status: "error",
-        data: "Petak not found",
-      });
+    if (!data) {
+      return notFound(res);
     }
 
-    const data = result.rows[0];
-    
     res.json({
       code: 200,
       status: "success",
@@ -144,47 +104,19 @@ exports.getWaterAnalisis = async (req, res) => {
         sat_epoch: data.sat_epoch
       },
     });
-
   } catch (error) {
-    console.error("Error getting petak by ID:", error);
-    res.status(500).json({
-      code: 500,
-      status: "error",
-      data: "Internal Server Error",
-    });
+    return serverError(res, error);
   }
 };
 
 exports.getBareAnalisis = async (req, res) => {
-  const token = getBearerToken(req, res);
-  if (!token) return;
-
   try {
-    const petakId = req.params.id;
+    const data = await findPetakSummary(req.params.id, PETAK_SUMMARY_COLUMNS.bare);
 
-    // Get the exact petak by ID with geometry for precise zooming
-    const result = await db2.query(
-      `
-      SELECT 
-        petak_id,
-        bare_val_last2th,
-        sat_epoch
-      FROM petak_summary
-      WHERE petak_id = $1
-      `,
-      [petakId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        status: "error",
-        data: "Petak not found",
-      });
+    if (!data) {
+      return notFound(res);
     }
 
-    const data = result.rows[0];
-    
     res.json({
       code: 200,
       status: "success",
@@ -194,13 +126,7 @@ exports.getBareAnalisis = async (req, res) => {
         sat_epoch: data.sat_epoch
       },
     });
-
   } catch (error) {
-    console.error("Error getting petak by ID:", error);
-    res.status(500).json({
-      code: 500,
-      status: "error",
-      data: "Internal Server Error",
-    });
+    return serverError(res, error);
   }
 };

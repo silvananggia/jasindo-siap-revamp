@@ -6,6 +6,22 @@ const axios = require("axios");
 const { v4: uuidv4 } = require('uuid');
 const { getBearerToken } = require("../utils/auth");
 
+const ensureLonLatColumns = async () => {
+  await db.query(`ALTER TABLE petak_user ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION`);
+  await db.query(`ALTER TABLE petak_user ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION`);
+};
+
+const extractLonLat = (item) => {
+  const lon = item.longitude ?? item.lon ?? item.long;
+  const lat = item.latitude ?? item.lat;
+  const lonNum = lon === undefined || lon === null || lon === '' ? null : Number(lon);
+  const latNum = lat === undefined || lat === null || lat === '' ? null : Number(lat);
+  return {
+    longitude: Number.isFinite(lonNum) ? lonNum : null,
+    latitude: Number.isFinite(latNum) ? latNum : null,
+  };
+};
+
 exports.savePetakUser = async (req, res) => {
   const token = getBearerToken(req, res);
   if (!token) return;
@@ -19,7 +35,7 @@ exports.savePetakUser = async (req, res) => {
   // Extract all idpetak from the incoming batch
   const idpetakList = percils.map(p => p.idpetak);
 
-  // Check for duplicate idpetak globally in petak_user
+  // Check for duplicate idpetak or same coordinates globally in petak_user
   try {
     const checkQuery = `SELECT idpetak FROM petak_user WHERE idpetak = ANY($1)`;
     const checkResult = await db.query(checkQuery, [idpetakList]);
@@ -27,9 +43,39 @@ exports.savePetakUser = async (req, res) => {
       const existing = checkResult.rows.map(r => r.idpetak);
       return res.status(409).json({ error: 'Duplicate idpetak found', duplicates: existing });
     }
+
+    const coordValues = percils
+      .map((item) => extractLonLat(item))
+      .filter((item) => Number.isFinite(item.longitude) && Number.isFinite(item.latitude));
+    if (coordValues.length > 0) {
+      const coordResult = await db.query(
+        `
+        SELECT p.idpetak
+        FROM petak_user p
+        JOIN unnest($1::float8[], $2::float8[]) AS i(lon, lat)
+          ON ROUND(p.longitude::numeric, 5) = ROUND(i.lon::numeric, 5)
+         AND ROUND(p.latitude::numeric, 5) = ROUND(i.lat::numeric, 5)
+        WHERE p.longitude IS NOT NULL AND p.latitude IS NOT NULL
+        `,
+        [coordValues.map((item) => item.longitude), coordValues.map((item) => item.latitude)]
+      );
+      if (coordResult.rows.length > 0) {
+        return res.status(409).json({
+          error: 'Duplicate coordinates found',
+          duplicates: coordResult.rows.map((row) => row.idpetak),
+        });
+      }
+    }
   } catch (error) {
     console.error('Error checking duplicate idpetak:', error);
     return res.status(500).json({ error: 'Database error during duplicate check' });
+  }
+
+  try {
+    await ensureLonLatColumns();
+  } catch (error) {
+    console.error('Error ensuring longitude/latitude columns:', error);
+    return res.status(500).json({ error: 'Database error preparing coordinate columns' });
   }
 
   const insertValues = [];
@@ -39,20 +85,30 @@ exports.savePetakUser = async (req, res) => {
   for (let index = 0; index < percils.length; index++) {
     const percilsItem = percils[index];
     const { nik, idpetak, luas, musim_tanam, tgl_tanam, tgl_panen, geometry } = percilsItem;
+    const { longitude, latitude } = extractLonLat(percilsItem);
+    const luasNum = luas === undefined || luas === null || luas === '' ? NaN : Number(luas);
 
-    if (!nik || !idpetak || !luas || !musim_tanam || !tgl_tanam || !tgl_panen || !geometry) {
+    let geometryPayload = geometry;
+    if (!geometryPayload && Number.isFinite(longitude) && Number.isFinite(latitude)) {
+      geometryPayload = {
+        type: 'Point',
+        coordinates: [longitude, latitude, 0],
+      };
+    }
+
+    if (!nik || !idpetak || !Number.isFinite(luasNum) || luasNum < 0 || !musim_tanam || !tgl_tanam || !tgl_panen || !geometryPayload) {
       return res.status(400).json({ error: `Missing required fields in percils ${index + 1}` });
     }
 
     const id = uuidv4(); // Generate a unique UUID for each percils
 
     // Prepare the query part and corresponding values for batch insert
-    insertValues.push(id, nik, idpetak, luas, musim_tanam, tgl_tanam, tgl_panen, JSON.stringify(geometry));
-    insertQueryParts.push(`($${index * 8 + 1}, $${index * 8 + 2}, $${index * 8 + 3}, $${index * 8 + 4}, $${index * 8 + 5}, $${index * 8 + 6}, $${index * 8 + 7}, ST_GeomFromGeoJSON($${index * 8 + 8}))`);
+    insertValues.push(id, nik, idpetak, luasNum, musim_tanam, tgl_tanam, tgl_panen, JSON.stringify(geometryPayload), longitude, latitude);
+    insertQueryParts.push(`($${index * 10 + 1}, $${index * 10 + 2}, $${index * 10 + 3}, $${index * 10 + 4}, $${index * 10 + 5}, $${index * 10 + 6}, $${index * 10 + 7}, ST_GeomFromGeoJSON($${index * 10 + 8}), $${index * 10 + 9}, $${index * 10 + 10})`);
   }
 
   const insertQuery = `
-      INSERT INTO petak_user (id, nik, idpetak, luas,musim_tanam, tgl_tanam, tgl_panen, geometry)
+      INSERT INTO petak_user (id, nik, idpetak, luas,musim_tanam, tgl_tanam, tgl_panen, geometry, longitude, latitude)
       VALUES ${insertQueryParts.join(', ')}
   `;
 
@@ -74,11 +130,18 @@ exports.listPetakUser = async (req, res) => {
   try {
     const id = req.params.id;
 
+    try {
+      await ensureLonLatColumns();
+    } catch (error) {
+      console.error('Error ensuring longitude/latitude columns:', error);
+    }
+
     const result = await db.query(
       `
-    SELECT petak_user.id AS id, luas, idpetak
-    FROM petak_user
-    WHERE petak_user.nik=$1
+            SELECT petak_user.id AS id, luas, idpetak, longitude, latitude
+            FROM petak_user
+            WHERE petak_user.nik=$1
+            ORDER BY petak_user.idpetak, petak_user.id
     `,
       [id]
     );
@@ -497,7 +560,12 @@ exports.getPetakUserByNikGeoJSON = async (req, res) => {
         nik,
         luas,
         idpetak,
-        ST_AsGeoJSON(ST_Transform(geometry, 4326))::json AS geometry
+        ST_AsGeoJSON(
+          CASE
+            WHEN ST_SRID(geometry) IN (0, 4326) THEN ST_SetSRID(geometry, 4326)
+            ELSE ST_Transform(geometry, 4326)
+          END
+        )::json AS geometry
       FROM petak_user
       WHERE nik = $1
       ORDER BY idpetak
@@ -506,10 +574,10 @@ exports.getPetakUserByNikGeoJSON = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        status: "error",
-        data: "No petak data found for this NIK",
+      return res.json({
+        type: 'FeatureCollection',
+        total_luas: 0,
+        features: [],
       });
     }
 
@@ -607,6 +675,156 @@ exports.checkPercilAvailability = async (req, res) => {
       code: 500,
       status: "error",
       data: "Internal Server Error",
+    });
+  }
+};
+
+exports.listPetakPointsByExtent = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
+  const minx = Number(req.query.minx);
+  const miny = Number(req.query.miny);
+  const maxx = Number(req.query.maxx);
+  const maxy = Number(req.query.maxy);
+  const nik = req.query.nik || '';
+
+  if (![minx, miny, maxx, maxy].every(Number.isFinite) || minx >= maxx || miny >= maxy) {
+    return res.status(400).json({
+      code: 400,
+      status: 'error',
+      data: 'Invalid extent. Provide minx, miny, maxx, maxy as longitude/latitude.',
+    });
+  }
+
+  if ((maxx - minx) > 1.5 || (maxy - miny) > 1.5) {
+    return res.json({
+      code: 200,
+      status: 'success',
+      data: [],
+    });
+  }
+
+  try {
+    await ensureLonLatColumns();
+  } catch (error) {
+    console.error('Error ensuring longitude/latitude columns:', error);
+  }
+
+  try {
+    const result = await db.query(
+      `
+      SELECT
+        id,
+        idpetak,
+        (nik = $5) AS mine,
+        COALESCE(
+          longitude,
+          ST_X(ST_Transform(ST_SetSRID(ST_Centroid(geometry), 3857), 4326))
+        ) AS longitude,
+        COALESCE(
+          latitude,
+          ST_Y(ST_Transform(ST_SetSRID(ST_Centroid(geometry), 3857), 4326))
+        ) AS latitude
+      FROM petak_user
+      WHERE geometry && ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, 4326), 3857)
+      LIMIT 800
+      `,
+      [minx, miny, maxx, maxy, nik]
+    );
+
+    res.json({
+      code: 200,
+      status: 'success',
+      data: result.rows.map((row) => ({
+        id: row.id,
+        idpetak: row.idpetak,
+        mine: Boolean(row.mine),
+        longitude: Number(row.longitude),
+        latitude: Number(row.latitude),
+      })),
+    });
+  } catch (error) {
+    console.error('Error listing petak points by extent:', error);
+    res.status(500).json({
+      code: 500,
+      status: 'error',
+      data: 'Internal Server Error',
+    });
+  }
+};
+
+exports.checkPetakBatch = async (req, res) => {
+  const token = getBearerToken(req, res);
+  if (!token) return;
+
+  const { nik, items, jmlPetak } = req.body || {};
+  if (!nik || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({
+      code: 400,
+      status: 'error',
+      data: 'nik and items[] are required',
+    });
+  }
+
+  try {
+    await ensureLonLatColumns();
+  } catch (error) {
+    console.error('Error ensuring longitude/latitude columns:', error);
+  }
+
+  try {
+    const countResult = await db.query(
+      `SELECT COUNT(*)::int AS count FROM petak_user WHERE nik = $1`,
+      [nik]
+    );
+    const nikCount = countResult.rows[0]?.count || 0;
+    const quota = Number(jmlPetak);
+    const quotaExceeded = Number.isFinite(quota) && quota > 0 && (nikCount + items.length) > quota;
+
+    const ids = items.map((item) => String(item.idpetak || '')).filter(Boolean);
+    const existingIds = ids.length
+      ? (await db.query(
+          `SELECT idpetak, nik FROM petak_user WHERE idpetak = ANY($1)`,
+          [ids]
+        )).rows
+      : [];
+
+    const coords = items
+      .map((item) => extractLonLat(item))
+      .filter((item) => Number.isFinite(item.longitude) && Number.isFinite(item.latitude));
+
+    const existingCoords = coords.length
+      ? (await db.query(
+          `
+          SELECT p.idpetak, p.nik, p.longitude, p.latitude
+          FROM petak_user p
+          JOIN unnest($1::float8[], $2::float8[]) AS i(lon, lat)
+            ON ROUND(p.longitude::numeric, 5) = ROUND(i.lon::numeric, 5)
+           AND ROUND(p.latitude::numeric, 5) = ROUND(i.lat::numeric, 5)
+          WHERE p.longitude IS NOT NULL AND p.latitude IS NOT NULL
+          `,
+          [coords.map((item) => item.longitude), coords.map((item) => item.latitude)]
+        )).rows
+      : [];
+
+    res.json({
+      code: 200,
+      status: 'success',
+      data: {
+        nikCount,
+        quotaExceeded,
+        existingIds,
+        existingCoords,
+        hasConflict: quotaExceeded || existingIds.length > 0 || existingCoords.length > 0,
+      },
+    });
+  } catch (error) {
+    console.error('Error checking petak batch:', error);
+    res.status(500).json({
+      code: 500,
+      status: 'error',
+      data: 'Internal Server Error',
     });
   }
 };

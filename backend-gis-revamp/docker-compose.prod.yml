@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend-gis-revamp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend_gis_revamp_api
+   
+    ports:
+      - "8083:8083"
+    networks:
+      gisnet:
+        aliases:
+          - backend-gis-revamp.docker
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  gisnet:
+    external: true
+
