@@ -26,39 +26,48 @@ export const getPercilStyle = (selection, lockedIDs = [], isLimitReached = false
     lockedIDs.includes(possibleId) || lockedIDs.includes(possibleId.toString())
   );
   
-  
-  let strokeColor = 'rgba(0, 255, 0, 0.3)';  // Green for selected and registered
-  let fillColor = 'rgba(0, 255, 0, 0.03)'; // Green fill
+  // Unselected: strong cyan (not white) so polygons stay visible on imagery
+  let strokeColor = '#00ACC1';
+  let fillColor = 'rgba(0, 172, 193, 0.28)';
+  let textColor = '#006064';
+  let textHalo = '#FFFFFF';
+  let strokeWidth = 2;
   
   if (isSelected || isLocked) {
-    strokeColor = '#FF5733'; // Default red
-    fillColor = 'rgba(255, 87, 51, 0.1)'; // Default red fill
+    strokeColor = '#FF5733';
+    fillColor = 'rgba(255, 87, 51, 0.35)';
+    textColor = '#FFFFFF';
+    textHalo = '#000000';
+    strokeWidth = 2.5;
   } else if (isLimitReached) {
-    strokeColor = '#9E9E9E'; // Light gray for unavailable when limit reached
-    fillColor = 'rgba(158, 158, 158, 0.05)'; // Very light gray fill
+    strokeColor = '#616161';
+    fillColor = 'rgba(97, 97, 97, 0.2)';
+    textColor = '#212121';
+    textHalo = '#FFFFFF';
+    strokeWidth = 1.5;
   }
   
   return new Style({
     stroke: new Stroke({
       color: strokeColor,
-      width: 1,
+      width: strokeWidth,
     }),
     fill: new Fill({
       color: fillColor,
     }),
     text: new Text({
       text: displayPetakId ? displayPetakId.toString() : '',
-      font: '10px Arial, sans-serif',
+      font: 'bold 11px Arial, sans-serif',
       fill: new Fill({
-        color: '#FFFFFF',
+        color: textColor,
       }),
       stroke: new Stroke({
-        color: '#000000',
-        width: 1
+        color: textHalo,
+        width: 3
       }),
       offsetY: 0,
       textAlign: 'center',
       textBaseline: 'middle'
     })
   });
-}; 
+};

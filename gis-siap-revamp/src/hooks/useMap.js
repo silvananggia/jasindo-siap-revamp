@@ -21,6 +21,8 @@ const hasUsableTileUrl = (tileUrl) => {
 };
 
 const createPetakLayer = (tileUrl) => {
+  // Always create the layer so callers (e.g. MapAnggota view-petak) can
+  // later setSource/setVisible. Empty URL → invisible, no tile requests.
   const usable = hasUsableTileUrl(tileUrl);
   return new VectorTileLayer({
     className: 'ol-petak-mvt',
@@ -42,6 +44,8 @@ const DEFAULT_MAP_ZOOM = 5;
 export const useMap = (isAuthenticated, googleApiKey, onPercilSelect, tileUrl, options = {}) => {
   const {
     enableFeatureClick = true,
+    // MapRegister: false — no Martin/MVT petak layer at all
+    enablePetakLayer = true,
     initialCenter = DEFAULT_MAP_CENTER,
     initialZoom = DEFAULT_MAP_ZOOM,
   } = options;
@@ -60,7 +64,7 @@ export const useMap = (isAuthenticated, googleApiKey, onPercilSelect, tileUrl, o
     if (!basemapLayerRef.current) {
       basemapLayerRef.current = createBasemapLayer("map-switch-basic", googleApiKey);
     }
-    polygonLayerRef.current = createPetakLayer(tileUrl);
+    polygonLayerRef.current = enablePetakLayer ? createPetakLayer(tileUrl) : null;
 
     const map = new Map({
       target: mapRef.current,
@@ -187,7 +191,7 @@ export const useMap = (isAuthenticated, googleApiKey, onPercilSelect, tileUrl, o
       polygonLayerRef.current = null;
       basemapLayerRef.current = null;
     };
-  }, [isAuthenticated, googleApiKey, enableFeatureClick, centerLon, centerLat, initialZoom]);
+  }, [isAuthenticated, googleApiKey, enableFeatureClick, enablePetakLayer, centerLon, centerLat, initialZoom]);
 
   useEffect(() => {
     if (mapInstance.current && clickHandlerRef.current) {

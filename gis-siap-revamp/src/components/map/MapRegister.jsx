@@ -651,13 +651,18 @@ const MapRegister = () => {
     );
   }, []);
 
-  // Martin petak tiles (petak_kabupaten) intentionally disabled on register map
+  // MapRegister: no Martin/MVT petak layer — only user-drawn/saved geometries
   const { mapRef, mapInstance, polygonLayerRef, basemapLayerRef, mapReady } = useMap(
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     () => {},
     '',
-    { enableFeatureClick: false, initialZoom: 5, initialCenter: [118, -2] },
+    {
+      enableFeatureClick: false,
+      enablePetakLayer: false,
+      initialZoom: 5,
+      initialCenter: [118, -2],
+    },
   );
 
   useEffect(() => {
@@ -1099,10 +1104,7 @@ const MapRegister = () => {
   }, [selectedPercils, markedPoints, totalArea, jmlPetak, luasLahan, listPetak, isDataLoaded, petakFetched]);
 
   useEffect(() => {
-    // Keep Martin MVT layer hidden; only toggle user-drawn/generated polygons
-    if (polygonLayerRef.current) {
-      polygonLayerRef.current.setVisible(false);
-    }
+    // No MVT layer on register; only toggle user-drawn/generated polygons
     if (generatedLayerRef.current) {
       generatedLayerRef.current.setVisible(isPolygonVisible);
       generatedLayerRef.current.setOpacity(polygonOpacity);
