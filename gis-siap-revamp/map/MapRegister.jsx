@@ -37,6 +37,7 @@ import useSwipeGesture from '../../hooks/useSwipeGesture';
 import { createBasemapLayer } from '../../utils/mapUtils';
 import { handleSearch, boundsToMapExtent, fitViewToExtent, toMapCoordinate } from '../../utils/mapUtils';
 import { createPetak, getPetakUser, deletePetak, getPetakById, getCenterPetakUser } from '../../actions/petakActions';
+import { processPetakPoints } from '../../services/petakGenService';
 import PetakService from '../../services/petakService';
 import { getDetailPeserta } from '../../actions/anggotaActions';
 import BasemapSwitcher from './BasemapSwitcher';
@@ -530,6 +531,7 @@ const MapRegister = () => {
   const [panelOpen, setPanelOpen] = useState(!isMobile); // Panel closed by default on mobile
   const [pointCount, setPointCount] = useState(0);
   const [markedPoints, setMarkedPoints] = useState([]);
+  const [isProcessingPoints, setIsProcessingPoints] = useState(false);
   const googlePlacesReady = useGooglePlacesReady();
 
   const selectedPercilsRef = useRef([]);
@@ -551,6 +553,7 @@ const MapRegister = () => {
   const [petakFetched, setPetakFetched] = useState(false);
   const drawModeRef = useRef(false);
   const [drawMode, setDrawMode] = useState(false);
+  const [drawFallback, setDrawFallback] = useState(false);
   const drawInteractionRef = useRef(null);
   const modifyInteractionRef = useRef(null);
   const hoveredPetakIdRef = useRef(null);
@@ -613,6 +616,11 @@ const MapRegister = () => {
     nikRef.current = nik;
   }, [nik]);
 
+  useEffect(() => {
+    loadOwnedPointsRef.current?.();
+    loadSavedGeometriesRef.current?.();
+  }, [listPetak, nik, petakFetched]);
+
   const syncPointsFromSource = useCallback((source) => {
     if (!source) {
       setMarkedPoints([]);
@@ -643,18 +651,13 @@ const MapRegister = () => {
     );
   }, []);
 
-  // MapRegister: no Martin/MVT petak layer — only user-drawn/saved geometries
+  // Martin petak tiles (petak_kabupaten) intentionally disabled on register map
   const { mapRef, mapInstance, polygonLayerRef, basemapLayerRef, mapReady } = useMap(
     isAuthenticated,
     process.env.REACT_APP_GOOGLE_API_KEY,
     () => {},
     '',
-    {
-      enableFeatureClick: false,
-      enablePetakLayer: false,
-      initialZoom: 5,
-      initialCenter: [118, -2],
-    },
+    { enableFeatureClick: false, initialZoom: 5, initialCenter: [118, -2] },
   );
 
   useEffect(() => {
@@ -931,6 +934,9 @@ const MapRegister = () => {
       ownedLoadTimer = window.setTimeout(loadOwnedPoints, 280);
     };
     map.on('moveend', loadOwnedPointsRef.current);
+    if (isAuthReadyRef.current) {
+      loadOwnedPoints();
+    }
 
     let savedLoadSeq = 0;
     const loadSavedGeometries = async () => {
@@ -943,18 +949,6 @@ const MapRegister = () => {
         source.clear();
         return;
       }
-      const unique = [];
-      const seen = new Set();
-      const addFeature = (feature, id) => {
-        const key = String(id || '');
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        feature.set('idpetak', key);
-        feature.set('localId', key);
-        feature.set('saved', true);
-        feature.setId(key);
-        unique.push(feature);
-      };
       try {
         const res = await PetakService.getPetakGeoJSON(currentNik);
         if (seq !== savedLoadSeq) return;
@@ -965,34 +959,27 @@ const MapRegister = () => {
           dataProjection: 'EPSG:4326',
           featureProjection: map.getView().getProjection(),
         });
+        const unique = [];
+        const seen = new Set();
         features.forEach((feature) => {
-          addFeature(feature, feature.get('idpetak') || feature.get('id') || feature.getId());
+          const id = String(feature.get('idpetak') || feature.getId() || '');
+          if (!id || seen.has(id)) return;
+          seen.add(id);
+          feature.set('idpetak', id);
+          feature.set('localId', id);
+          feature.set('saved', true);
+          feature.setId(id);
+          unique.push(feature);
         });
+        if (seq !== savedLoadSeq) return;
+        source.clear(true);
+        source.addFeatures(unique);
       } catch (error) {
-        // Fall through to lon/lat from the petak list.
+        if (seq !== savedLoadSeq) return;
+        source.clear(true);
       }
-      if (seq !== savedLoadSeq) return;
-      (listPetakRef.current || []).forEach((item) => {
-        const lon = Number(item.longitude ?? item.lon);
-        const lat = Number(item.latitude ?? item.lat);
-        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-        const isTitik = item.status === 'titik' || Number(item.luas) === 0;
-        if (!isTitik) return;
-        const feature = new Feature({
-          geometry: new Point(fromLonLat([lon, lat])),
-          status: item.status || 'titik',
-        });
-        addFeature(feature, item.idpetak || item.id);
-      });
-      if (seq !== savedLoadSeq) return;
-      source.clear(true);
-      source.addFeatures(unique);
     };
     loadSavedGeometriesRef.current = loadSavedGeometries;
-    if (isAuthReadyRef.current) {
-      loadOwnedPoints();
-      loadSavedGeometries();
-    }
 
     const handlePointerMove = (evt) => {
       if (evt.dragging) return;
@@ -1061,12 +1048,6 @@ const MapRegister = () => {
   }, [isAuthenticated, mapReady, mapInstance, syncPointsFromSource]);
 
   useEffect(() => {
-    if (!mapReady || !isAuthReady) return;
-    loadOwnedPointsRef.current?.();
-    loadSavedGeometriesRef.current?.();
-  }, [mapReady, isAuthReady, listPetak, nik, petakFetched]);
-
-  useEffect(() => {
     if (formResponse.address) {
       setSearchInput(formResponse.address);
     }
@@ -1118,7 +1099,10 @@ const MapRegister = () => {
   }, [selectedPercils, markedPoints, totalArea, jmlPetak, luasLahan, listPetak, isDataLoaded, petakFetched]);
 
   useEffect(() => {
-    // No MVT layer on register; only toggle user-drawn/generated polygons
+    // Keep Martin MVT layer hidden; only toggle user-drawn/generated polygons
+    if (polygonLayerRef.current) {
+      polygonLayerRef.current.setVisible(false);
+    }
     if (generatedLayerRef.current) {
       generatedLayerRef.current.setVisible(isPolygonVisible);
       generatedLayerRef.current.setOpacity(polygonOpacity);
@@ -1285,6 +1269,145 @@ const MapRegister = () => {
     });
   }, [mapInstance, setHoveredPetak]);
 
+  const handleProcessPoints = async () => {
+    const map = mapInstance.current;
+    const pointsSource = pointsSourceRef.current;
+    const generatedSource = generatedSourceRef.current;
+    if (!map || !pointsSource || !generatedSource) return;
+
+    const currentJmlPetak = jmlPetakRef.current;
+    if (!currentJmlPetak || currentJmlPetak <= 0) {
+      setAlertMessage('Data jumlah petak belum tersedia. Silakan tunggu data dimuat.');
+      setAlertOpen(true);
+      return;
+    }
+
+    setVertexDeleteEnabled(false);
+    setDrawModeEnabled(false);
+
+    const remaining =
+      currentJmlPetak - (listPetak || []).length - selectedPercilsRef.current.length;
+    if (remaining <= 0) {
+      setAlertMessage(`Tidak dapat menambah petak lagi. Batas maksimum (${currentJmlPetak}) sudah tercapai.`);
+      setAlertOpen(true);
+      return;
+    }
+
+    const pointFeatures = pointsSource.getFeatures().sort(
+      (a, b) => Number(a.get('id') || a.getId()) - Number(b.get('id') || b.getId())
+    );
+    if (pointFeatures.length !== remaining) {
+      setAlertMessage(`Jumlah titik harus sama dengan sisa petak (${remaining}). Saat ini ${pointFeatures.length} titik.`);
+      setAlertOpen(true);
+      return;
+    }
+
+    const zoom = Math.round(map.getView().getZoom()) || 19;
+    const payload = {
+      zoom,
+      geojson: {
+        type: 'FeatureCollection',
+        features: pointFeatures.map((feature) => {
+          const id = Number(feature.get('id') || feature.getId());
+          const [lon, lat] = toLonLat(feature.getGeometry().getCoordinates());
+          return {
+            type: 'Feature',
+            id,
+            properties: { id },
+            geometry: {
+              type: 'Point',
+              coordinates: [lon, lat],
+            },
+          };
+        }),
+      },
+    };
+
+    setIsProcessingPoints(true);
+    try {
+      const response = await processPetakPoints(payload);
+      const collection = response.data;
+      const features = Array.isArray(collection?.features)
+        ? collection.features
+        : collection?.type === 'Feature'
+          ? [collection]
+          : [];
+      const polygonFeatures = features.filter(
+        (feature) =>
+          feature?.geometry &&
+          (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')
+      );
+
+      if (!polygonFeatures.length) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Tidak ada petak',
+          text: 'Generate gagal. Gambar polygon, atau simpan jika jumlah titik sudah sesuai kuota petak.',
+        });
+        setDrawFallback(true);
+        setDrawModeEnabled(true);
+        return;
+      }
+
+      const olFeatures = geojsonFormat.readFeatures(
+        { type: 'FeatureCollection', features: polygonFeatures },
+        {
+          dataProjection: 'EPSG:4326',
+          featureProjection: map.getView().getProjection(),
+        }
+      );
+
+      const coordsByPointId = new Map();
+      pointFeatures.forEach((feature) => {
+        const id = Number(feature.get('id') || feature.getId());
+        coordsByPointId.set(id, toLonLat(feature.getGeometry().getCoordinates()));
+      });
+
+      const usedIds = new Set([
+        ...selectedPercilsRef.current.map((p) => String(p.id)),
+        ...(listPetak || []).map((p) => String(p.idpetak || p.id || '')),
+      ]);
+
+      const accepted = [];
+      olFeatures.forEach((olFeature) => {
+        if (accepted.length >= remaining) return;
+        const pointId = Number(olFeature.get('id') ?? olFeature.getId());
+        const lonLat = coordsByPointId.get(pointId) || getFeatureLonLat(olFeature);
+        let persilId = lonLat ? buildPersilId(lonLat[0], lonLat[1]) : 'T0_S0';
+        if (usedIds.has(persilId)) {
+          let suffix = 2;
+          while (usedIds.has(`${persilId}_${suffix}`)) suffix += 1;
+          persilId = `${persilId}_${suffix}`;
+        }
+        usedIds.add(persilId);
+        olFeature.set('localId', persilId);
+        olFeature.setId(persilId);
+        generatedSource.addFeature(olFeature);
+        accepted.push(geometryToPercil(olFeature, persilId));
+      });
+
+      setSelectedPercils((prev) => [...prev, ...accepted]);
+      setDrawFallback(false);
+      handleClearPoints();
+
+      if (olFeatures.length > remaining) {
+        setAlertMessage(`Hanya ${remaining} petak yang ditambahkan karena batas jumlah petak.`);
+        setAlertOpen(true);
+      }
+    } catch (error) {
+      console.error('Error processing points:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: 'Generate gagal. Gambar polygon, atau simpan jika jumlah titik sudah sesuai kuota petak.',
+      });
+      setDrawFallback(true);
+      setDrawModeEnabled(true);
+    } finally {
+      setIsProcessingPoints(false);
+    }
+  };
+
   const handleSimpan = async () => {
     const defaults = {
       musim_tanam: formResponse.musimTanam || 'MT1',
@@ -1392,6 +1515,7 @@ const MapRegister = () => {
       setVertexDeleteEnabled(false);
       generatedSourceRef.current?.clear();
       handleClearPoints();
+      setDrawFallback(false);
 
       await refreshPetakData();
       await loadSavedGeometriesRef.current?.();
@@ -1484,11 +1608,6 @@ const MapRegister = () => {
     try {
       const result = await dispatch(getPetakUser(currentNik));
       setPetakFetched(true);
-      if (Array.isArray(result?.data)) {
-        listPetakRef.current = result.data;
-      }
-      await loadSavedGeometriesRef.current?.();
-      loadOwnedPointsRef.current?.();
       return result;
     } catch (error) {
       console.error('Error refreshing petak data:', error);
@@ -1510,7 +1629,6 @@ const MapRegister = () => {
     refreshPetakData().then((result) => {
       if (cancelled || !result) return;
       loadSavedGeometriesRef.current?.();
-      loadOwnedPointsRef.current?.();
     });
 
     return () => {
@@ -1519,7 +1637,7 @@ const MapRegister = () => {
   }, [isAuthReady, authToken, nik, nikFromUrl, refreshPetakData]);
 
   useEffect(() => {
-    if (!mapReady || !isAuthReady || hasInitialZoomedRef.current) return;
+    if (!mapReady || hasInitialZoomedRef.current) return;
     const map = mapInstance.current;
     if (!map) return;
 
@@ -1533,12 +1651,8 @@ const MapRegister = () => {
 
     let cancelled = false;
     const run = async () => {
-      await loadSavedGeometriesRef.current?.();
-      if (cancelled) return;
-
       if (fitSaved()) {
         hasInitialZoomedRef.current = true;
-        loadOwnedPointsRef.current?.();
         return;
       }
 
@@ -1547,7 +1661,6 @@ const MapRegister = () => {
         const ok = await zoomToPetakDataRef.current(petakList);
         if (!cancelled && ok) {
           hasInitialZoomedRef.current = true;
-          loadOwnedPointsRef.current?.();
           return;
         }
       }
@@ -1558,7 +1671,6 @@ const MapRegister = () => {
         const ok = await handleSearch(address, map, process.env.REACT_APP_GOOGLE_API_KEY, { silent: true });
         if (!cancelled && ok) {
           hasInitialZoomedRef.current = true;
-          loadOwnedPointsRef.current?.();
         }
       }
     };
@@ -1568,7 +1680,7 @@ const MapRegister = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [mapReady, isAuthReady, petakFetched, listPetak, formResponse.address, searchInput]);
+  }, [mapReady, petakFetched, listPetak, formResponse.address, searchInput]);
 
   if (errmessage) {
     return (
@@ -1645,6 +1757,7 @@ const MapRegister = () => {
           <Button
             size="small"
             variant={drawMode ? 'contained' : 'outlined'}
+            color={drawFallback && !drawMode ? 'warning' : 'primary'}
             startIcon={<PentagonIcon />}
             disabled={remainingSlots <= 0}
             onClick={() => setDrawModeEnabled(!drawMode)}
@@ -1863,13 +1976,16 @@ const MapRegister = () => {
                 mapInstance={mapInstance}
                 markedPoints={markedPoints}
                 remainingSlots={remainingSlots}
+                onProcessPoints={handleProcessPoints}
                 onClearPoints={handleClearPoints}
                 onRemovePoint={handleRemovePoint}
                 onFocusPoint={handleFocusPoint}
+                isProcessingPoints={isProcessingPoints}
                 isVertexDeleteMode={vertexDeleteMode}
                 onSetVertexDeleteMode={setVertexDeleteEnabled}
                 isDrawMode={drawMode}
                 onSetDrawMode={setDrawModeEnabled}
+                isDrawFallback={drawFallback}
                 hoveredPetakId={hoveredPetakId}
                 onHoverPetak={setHoveredPetak}
                 onViewSavedPetak={handleViewSavedPetak}
@@ -1953,13 +2069,16 @@ const MapRegister = () => {
                 mapInstance={mapInstance}
                 markedPoints={markedPoints}
                 remainingSlots={remainingSlots}
+                onProcessPoints={handleProcessPoints}
                 onClearPoints={handleClearPoints}
                 onRemovePoint={handleRemovePoint}
                 onFocusPoint={handleFocusPoint}
+                isProcessingPoints={isProcessingPoints}
                 isVertexDeleteMode={vertexDeleteMode}
                 onSetVertexDeleteMode={setVertexDeleteEnabled}
                 isDrawMode={drawMode}
                 onSetDrawMode={setDrawModeEnabled}
+                isDrawFallback={drawFallback}
                 hoveredPetakId={hoveredPetakId}
                 onHoverPetak={setHoveredPetak}
                 onViewSavedPetak={handleViewSavedPetak}

@@ -93,16 +93,13 @@ const DataPanel = ({
   mapInstance, // Map instance for zoom functionality
   markedPoints = [],
   remainingSlots = 0,
-  onProcessPoints,
   onClearPoints,
   onRemovePoint,
   onFocusPoint,
-  isProcessingPoints = false,
   isVertexDeleteMode = false,
   onSetVertexDeleteMode,
   isDrawMode = false,
   onSetDrawMode,
-  isDrawFallback = false,
   hoveredPetakId = null,
   onHoverPetak,
   onViewSavedPetak,
@@ -574,7 +571,6 @@ const DataPanel = ({
               fullWidth
               variant={!isDrawMode ? 'contained' : 'outlined'}
               onClick={() => onSetDrawMode && onSetDrawMode(false)}
-              disabled={isProcessingPoints}
             >
               Tandai titik
             </Button>
@@ -582,25 +578,19 @@ const DataPanel = ({
               size="small"
               fullWidth
               variant={isDrawMode ? 'contained' : 'outlined'}
-              color={isDrawFallback && !isDrawMode ? 'warning' : 'primary'}
               onClick={() => onSetDrawMode && onSetDrawMode(!isDrawMode)}
-              disabled={isProcessingPoints || remainingSlots <= 0}
+              disabled={remainingSlots <= 0}
               startIcon={<PentagonIcon />}
             >
               Gambar polygon
             </Button>
           </Box>
-          {isDrawFallback && (
-            <Alert severity="warning" sx={{ py: 0, mb: 1 }}>
-              Generate tidak berhasil. Gambar polygon di peta, atau tandai titik lalu proses ulang.
-            </Alert>
-          )}
           <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
             {isDrawMode
               ? 'Klik peta untuk menambah sudut. Minimal 3 titik, lalu tekan Selesai di toolbar peta.'
               : remainingSlots > 0
-                ? `Klik peta untuk menandai ${remainingSlots} titik. Satu titik = satu petak, lalu proses.`
-                : 'Kuota petak sudah terisi. Hapus petak hasil proses jika ingin menandai ulang.'}
+                ? `Klik peta untuk menandai ${remainingSlots} titik. Satu titik = satu petak, lalu simpan.`
+                : 'Kuota petak sudah terisi. Hapus petak terpilih jika ingin menandai ulang.'}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
             {markedPoints.length}/{remainingSlots} titik
@@ -659,21 +649,10 @@ const DataPanel = ({
           {remainingSlots > 0 && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
               <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                onClick={onProcessPoints}
-                disabled={markedPoints.length !== remainingSlots || isProcessingPoints || isDrawMode}
-                startIcon={isProcessingPoints ? <CircularProgress size={16} color="inherit" /> : null}
-                size={isMobile ? 'medium' : 'large'}
-              >
-                {isProcessingPoints ? 'Memproses...' : `Proses ${remainingSlots} Petak`}
-              </Button>
-              <Button
                 variant="outlined"
                 fullWidth
                 onClick={onClearPoints}
-                disabled={markedPoints.length === 0 || isProcessingPoints}
+                disabled={markedPoints.length === 0}
                 size="small"
               >
                 Hapus Semua Titik
@@ -948,9 +927,11 @@ const DataPanel = ({
             )}
             <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
               {isMapRegister
-                ? (isVertexDeleteMode
-                    ? 'Mode hapus sudut aktif. Sudut ditampilkan saat petak di-hover atau peta diperbesar.'
-                    : 'Geser sudut untuk mengubah bentuk. Tarik garis tepi untuk menambah sudut. Sudut hanya tampil saat petak di-hover agar peta tetap rapi.')
+                ? (selectedPercils.length === 0
+                    ? 'Titik yang ditandai akan disimpan ke petak user. Lengkapi kuota, lalu simpan.'
+                    : isVertexDeleteMode
+                      ? 'Mode hapus sudut aktif. Sudut ditampilkan saat petak di-hover atau peta diperbesar.'
+                      : 'Geser sudut untuk mengubah bentuk. Tarik garis tepi untuk menambah sudut. Sudut hanya tampil saat petak di-hover agar peta tetap rapi.')
                 : 'Tarik titik putih untuk geser. Tarik garis tepi untuk menambah sudut. Klik dua kali titik untuk menghapus sudut.'}
             </Typography>
             
@@ -985,7 +966,7 @@ const DataPanel = ({
             {selectedPercils.length === 0 ? (
               <Typography variant={isMobile ? "body2" : "body1"}>
                 {isMapRegister && markedPoints.length > 0
-                  ? `${markedPoints.length} titik siap disimpan sebagai petak jika kuota sudah sesuai.`
+                  ? `${markedPoints.length} titik siap disimpan ke petak user.`
                   : 'Belum Ada Lahan Terpilih'}
               </Typography>
             ) : (

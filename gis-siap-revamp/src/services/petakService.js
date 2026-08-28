@@ -179,6 +179,54 @@ const getPetakGeoJSON = (nik, token = null) => {
   return axios.get('/petak-geojson', config);
 };
 
+const getPetakMonitor = (params = {}, token = null) => {
+  const config = { params };
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.get('/petak-monitor', config);
+};
+
+const getPetakMonitorByNik = (nik, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.get(`/petak-monitor/${encodeURIComponent(nik)}`, config);
+};
+
+const generatePetakMonitor = (data, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.post('/petak-monitor/generate', data, config);
+};
+
+const generateTitikMonitor = (data, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.post('/petak-monitor/generate-titik', data, config);
+};
+
+const revertPetakMonitor = (data, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.post('/petak-monitor/revert', data, config);
+};
+
+const updatePetakGeometries = (data, token = null) => {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  return axios.put('/petak-monitor/geometries', data, config);
+};
+
 const PetakService = {
     getPetakAll,
     getPetakUser,
@@ -194,6 +242,12 @@ const PetakService = {
     getPetakPointsByExtent,
     checkPetakBatch,
     getPetakGeoJSON,
+    getPetakMonitor,
+    getPetakMonitorByNik,
+    generatePetakMonitor,
+    generateTitikMonitor,
+    revertPetakMonitor,
+    updatePetakGeometries,
 };
 
 export default PetakService;

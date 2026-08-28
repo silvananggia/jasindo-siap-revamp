@@ -15,6 +15,7 @@ const MapViewClaim = lazy(() => import('../components/map/MapViewClaim'));
 const MapKlaimId = lazy(() => import('../components/map/MapClaimId'));
 const MapAnggotaKlaimId = lazy(() => import('../components/map/MapAnggotaKlaimId'));
 const MapViewKlaimId = lazy(() => import('../components/map/MapViewClaimId'));
+const MapDashboard = lazy(() => import('../components/map/MapDashboard'));
 
 function MyRouter() {
     return (
@@ -77,6 +78,11 @@ function MyRouter() {
             <Route path='/map-view-klaim-id' element={
                 <Suspense fallback={<Spinner className="content-loader" />}>
                     <MapViewKlaimId />
+                </Suspense>
+            } />
+            <Route path='/map-dashboard' element={
+                <Suspense fallback={<Spinner className="content-loader" />}>
+                    <MapDashboard />
                 </Suspense>
             } />
         </Routes>
