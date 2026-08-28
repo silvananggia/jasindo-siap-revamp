@@ -5,6 +5,13 @@ const petakUserController = require('../controllers/petakUser.controller');
 
 router.post('/save-petak', petakUserController.savePetakUser)
 router.post('/check-petak-batch', petakUserController.checkPetakBatch)
+router.post('/process-points', petakUserController.processPoints)
+router.get('/petak-monitor', petakUserController.listPetakMonitor)
+router.post('/petak-monitor/generate', petakUserController.generatePetakMonitor)
+router.post('/petak-monitor/generate-titik', petakUserController.generateTitikFromCentroid)
+router.post('/petak-monitor/revert', petakUserController.revertPetakMonitor)
+router.put('/petak-monitor/geometries', petakUserController.updatePetakGeometries)
+router.get('/petak-monitor/:nik', petakUserController.getPetakMonitorByNik)
 router.get('/petak-points-extent', petakUserController.listPetakPointsByExtent)
 router.get('/petak-user/:id', petakUserController.listPetakUser)
 router.get('/point-petak-user/:id', petakUserController.pointPetakUser)
